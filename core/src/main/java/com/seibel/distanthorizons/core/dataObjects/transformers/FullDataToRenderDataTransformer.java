@@ -247,10 +247,12 @@ public class FullDataToRenderDataTransformer
 					{
 						IBlockStateWrapper block = fullDataSource.mapping.getBlockStateWrapper(FullDataPointUtil.getId(fullData));
 						
-						// If the materials don't match then this render datapoint was likely merged during the
-						// render reducing phase, try using the texture from the block above it.
-						// This is necessary to fix snow rendering as the dirt/grass below it.
-						if (block.getMaterialId() != materialId
+						// If this render data is snow, but the block ID doesn't match,
+						// try getting the block above it.
+						// This is a hacky fix for snow on LOD borders rendering with the
+						// underlying grass/dirt block, instead of as snow.
+						if (materialId == EDhApiBlockMaterial.SNOW.index
+							&& block.getMaterialId() != materialId
 							&& fullIndex > 0)
 						{
 							// Note: this is a hack.
