@@ -227,6 +227,7 @@ public class FullDataToRenderDataTransformer
 			}
 			
 			int topBlockY = RenderDataPointUtil.getYMax(renderData) - 1;
+			byte materialId = RenderDataPointUtil.getBlockMaterialId(renderData);
 			
 			// find the full data point containing the render data point's top block,
 			// the full data column is sorted top down
@@ -245,6 +246,26 @@ public class FullDataToRenderDataTransformer
 					try
 					{
 						IBlockStateWrapper block = fullDataSource.mapping.getBlockStateWrapper(FullDataPointUtil.getId(fullData));
+						
+						// If the materials don't match then this render datapoint was likely merged during the
+						// render reducing phase, try using the texture from the block above it.
+						// This is necessary to fix snow rendering as the dirt/grass below it.
+						if (block.getMaterialId() != materialId
+							&& fullIndex > 0)
+						{
+							// Note: this is a hack.
+							// Since the Render data and textures aren't in the same data array it's difficult to map
+							// them together, but this guess works well enough for now.
+							
+							fullData = fullDataColumn.getLong(fullIndex - 1);
+							IBlockStateWrapper newBlock = fullDataSource.mapping.getBlockStateWrapper(FullDataPointUtil.getId(fullData));
+							// don't use air since that'll remove the texture
+							if (!newBlock.isAir())
+							{
+								block = newBlock;
+							}
+						}
+						
 						textureId = BlockTextureRegistry.INSTANCE.getOrRegisterBlockStateSetId(block);
 					}
 					catch (IndexOutOfBoundsException ignore)
@@ -304,13 +325,17 @@ public class FullDataToRenderDataTransformer
 		
 		boolean isColumnVoid = true;
 		
-		int colorToApplyToNextBlock = -1;
 		int lastColor = 0;
 		int lastBottom = -10_000;
 		IBlockStateWrapper lastBlock = null;
 		
+		// there are several instances where we'll want
+		// to copy the top datapoint down and override the one below it
+		int colorToApplyToNextBlock = -1;
+		IBlockStateWrapper blockToApplyToNextBlock = null;
 		int skylightToApplyToNextBlock = -1;
 		int blocklightToApplyToNextBlock = -1;
+		
 		int renderDataIndex = 0;
 		
 		
@@ -487,6 +512,9 @@ public class FullDataToRenderDataTransformer
 						// below it, if not done grass will appear as gray
 						int snowColor = levelWrapper.getBlockColor(mutableBlockPos, biome, fullDataSource, block);
 						colorToApplyToNextBlock = ColorUtil.setAlpha(snowColor, 255);
+						
+						// the dirt/grass below the snow should be related with snow
+						blockToApplyToNextBlock = block;
 					}
 					else //if (isWaterSurfaceReplacement)
 					{
@@ -507,6 +535,8 @@ public class FullDataToRenderDataTransformer
 					if (ignoredAlpha != 0)
 					{
 						colorToApplyToNextBlock = ColorUtil.setAlpha(ignoredColor, 255);
+						// also copy over the material so shaders/textures render correctly
+						blockToApplyToNextBlock = block;
 					}
 				}
 				
@@ -542,6 +572,7 @@ public class FullDataToRenderDataTransformer
 			
 			
 			int color;
+			// use the override values if necessary
 			if (colorToApplyToNextBlock == -1)
 			{
 				// use this block's color
@@ -560,10 +591,17 @@ public class FullDataToRenderDataTransformer
 					blockLight = blocklightToApplyToNextBlock;
 					blocklightToApplyToNextBlock = -1;
 				}
+				
+				if (blockToApplyToNextBlock != null)
+				{
+					block = blockToApplyToNextBlock;
+					blockToApplyToNextBlock = null;
+				}
 			}
 			else
 			{
-				// use the previous block's color
+				// use the previous block's info as available
+				
 				color = colorToApplyToNextBlock;
 				colorToApplyToNextBlock = -1;
 				
@@ -576,6 +614,11 @@ public class FullDataToRenderDataTransformer
 				if (blocklightToApplyToNextBlock != -1)
 				{
 					blockLight = blocklightToApplyToNextBlock;
+				}
+				
+				if (blockToApplyToNextBlock != null)
+				{
+					block = blockToApplyToNextBlock;
 				}
 			}
 			
