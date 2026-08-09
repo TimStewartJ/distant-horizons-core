@@ -116,6 +116,19 @@ public class ColumnBox
 			boolean skipTop = RenderDataPointUtil.doesDataPointExist(topData)
 					&& (RenderDataPointUtil.getYMin(topData) == maxY)
 					&& !isTopTransparent;
+			
+			// special case, don't render water under ice
+			// Note: since we don't have an Ice material we have to guess based on the top data's height
+			skipTop |= 
+				irisBlockMaterialId == EDhApiBlockMaterial.WATER.index
+				// ice doesn't have a material
+				&& RenderDataPointUtil.getBlockMaterialId(topData) == EDhApiBlockMaterial.UNKNOWN.index
+				// ice over water should only be 1 block thick, for all other cases we probably want the water to render 
+				&& RenderDataPointUtil.getYMax(topData) - RenderDataPointUtil.getYMin(topData) == 1
+				// when water is under ice it doesn't have any sky/block lighting
+				&& skyLightTop == LodUtil.MIN_MC_LIGHT
+				&& blockLight == LodUtil.MIN_MC_LIGHT;
+			
 			if (!skipTop)
 			{
 				builder.addQuadUp(
