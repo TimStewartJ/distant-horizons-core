@@ -61,6 +61,8 @@ public interface IBlockStateWrapper extends IDhApiBlockStateWrapper
 	 */
 	boolean isBeaconBaseBlock();
 	
+	boolean isIceBlock();
+	
 	/**
 	 * Some blocks don't pull their texture properly (like bamboo).
 	 * In those cases it's best to just render their base color.

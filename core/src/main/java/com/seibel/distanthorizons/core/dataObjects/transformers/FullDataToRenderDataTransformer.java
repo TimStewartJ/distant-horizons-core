@@ -403,6 +403,7 @@ public class FullDataToRenderDataTransformer
 			
 			
 			//==================//
+			// special case:    // 
 			// air gap leak fix //
 			//==================//
 			
@@ -415,6 +416,23 @@ public class FullDataToRenderDataTransformer
 				blockToApplyToNextBlock = null;
 				skylightToApplyToNextBlock = -1;
 				blocklightToApplyToNextBlock = -1;
+			}
+			
+			
+			
+			//=================//
+			// special case:   //
+			// water under ice //
+			//=================//
+			
+			// is this block water and the one above it ice?
+			if (block.getMaterialId() == EDhApiBlockMaterial.WATER.index
+				&& lastBlock != null
+				&& lastBlock.isIceBlock())
+			{
+				// Replace the water with ice to prevent rendering water
+				// under the frozen lakes (which looks bad).
+				block = lastBlock;
 			}
 			
 			
