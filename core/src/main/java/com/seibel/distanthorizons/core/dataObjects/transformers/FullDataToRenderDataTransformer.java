@@ -402,6 +402,23 @@ public class FullDataToRenderDataTransformer
 			
 			
 			
+			//==================//
+			// air gap leak fix //
+			//==================//
+			
+			if (block.isAir())
+			{
+				// we don't want to apply the last block over an air gap,
+				// doing so can cause weird lighting behavior for cave berries
+				// when hanging above water
+				colorToApplyToNextBlock = -1;
+				blockToApplyToNextBlock = null;
+				skylightToApplyToNextBlock = -1;
+				blocklightToApplyToNextBlock = -1;
+			}
+			
+			
+			
 			//====================//
 			// ignored block and  //
 			// cave culling check //
