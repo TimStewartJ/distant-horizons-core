@@ -482,6 +482,21 @@ public class ClientApi
 					}
 					
 					//endregion
+					
+					
+					
+					//===============================//
+					// Immersive Portals Mixin Check //
+					//===============================//
+					//region
+					
+					if (DelayedAccessors.IMMERSIVE_PORTALS != null)
+					{
+						DelayedAccessors.IMMERSIVE_PORTALS.logWarningIfMixinNotRunRecently();
+					}
+					
+					//endregion
+					
 				}
 			}
 			

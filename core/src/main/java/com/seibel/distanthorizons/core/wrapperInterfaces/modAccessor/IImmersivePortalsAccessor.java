@@ -87,6 +87,8 @@ public interface IImmersivePortalsAccessor extends IModAccessor
 	@Nullable
 	DhVec3d getActualCameraPos();
 	
+	void logWarningIfMixinNotRunRecently();
+	
 	
 	
 }
