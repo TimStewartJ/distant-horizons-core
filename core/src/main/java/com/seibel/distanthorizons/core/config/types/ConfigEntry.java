@@ -54,6 +54,12 @@ public class ConfigEntry<T> extends AbstractConfigBase<T>
 	/** Will be null if un-set */
 	@Nullable
 	private T apiValue;
+	/** 
+	 * When this option was last modified by the API.
+	 * This is present to prevent aliasing if the option is
+	 * rapidly set/cleared.
+	 */
+	private long apiValueLastSetMs = 0L;
 	
 	/** 
 	 * Will be null if un-set. <br> <br>
@@ -126,6 +132,8 @@ public class ConfigEntry<T> extends AbstractConfigBase<T>
 	public void setApiValue(T newApiValue)
 	{
 		this.apiValue = newApiValue;
+		this.apiValueLastSetMs = System.currentTimeMillis();
+		
 		synchronized (this.listenerList)
 		{
 			this.listenerList.forEach(IConfigListener::onConfigValueSet);
@@ -134,8 +142,33 @@ public class ConfigEntry<T> extends AbstractConfigBase<T>
 	
 	public boolean apiIsOverriding() 
 	{ 
-		return this.allowApiOverride 
-				&& this.apiValue != null; 
+		if (!this.allowApiOverride)
+		{
+			// this config can't be controlled via the API
+			return false;
+		}
+		
+		if (this.apiValue != null)
+		{
+			// an API value is currently present
+			return true;
+		}
+		
+		long timeSinceLastApiSet = (System.currentTimeMillis() - this.apiValueLastSetMs);
+		if (timeSinceLastApiSet < 500L)
+		{
+			// an API value was present very recently
+			
+			// This check is necessary to fix an issue where rendering mods may change
+			// an API option on a per-frame basis then disable it after the frame
+			// is over.
+			// Causing the UI to appear like the option can be changed,
+			// when it can't.
+			return true;
+		}
+		
+		// this option can be controlled like normal
+		return false;
 	}
 	
 	/** setting to null will allow the config to be used normally */
