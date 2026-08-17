@@ -67,3 +67,4 @@ test {
     // need more than the default 512 MB of RAM
     jvmArgs '-Xmx4096m'
 }
+
