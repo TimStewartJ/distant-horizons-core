@@ -155,7 +155,7 @@ public abstract class AbstractDhRepo<TKey, TDTO extends IBaseDTO<TKey>> implemen
 							"A file path was [" + databaseFilePath.length() + "] characters long. \n" +
 							"Windows only supports file paths up to 260 chars normally. \n" +
 							"Please enable long file paths in Windows. \n";
-					ClientApi.INSTANCE.queueChatMessage(message);
+					ClientApi.INSTANCE.queueSlowChatMessage(message);
 					
 					// add additional info to the log
 					windowsLongFileWarning = "Potential fix: enable long file paths in Windows.";
@@ -464,7 +464,7 @@ public abstract class AbstractDhRepo<TKey, TDTO extends IBaseDTO<TKey>> implemen
 							"Please leave the world and delete the corrupted database file to fix. \n" +
 							"Error: [" + e.getMessage() + "]", e);
 						
-						ClientApi.INSTANCE.queueChatMessage(
+						ClientApi.INSTANCE.queueSlowChatMessage(
 							MinecraftTextFormat.DARK_RED + MinecraftTextFormat.BOLD + "DH database is corrupted." + MinecraftTextFormat.CLEAR_FORMATTING + "\n" +
 								"DH will behave strangely if your continue playing. \n" +
 								"Please leave the world and delete the corrupted database file at: \n" +

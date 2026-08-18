@@ -75,7 +75,7 @@ public abstract class AbstractLodRequestState
 		{
 			this.progressUpdateThreadRunning = true;
 			
-			progressUpdaterThread.execute(() ->
+			this.progressUpdaterThread.execute(() ->
 			{
 				while (this.progressUpdateThreadRunning)
 				{
@@ -150,7 +150,8 @@ public abstract class AbstractLodRequestState
 			}
 			else if (displayLocation == EDhApiDistantGeneratorProgressDisplayLocation.CHAT)
 			{
-				ClientApi.INSTANCE.queueChatMessage(message);
+				// fast chat queue since the messages can be sent very quickly
+				ClientApi.INSTANCE.queueFastChatMessage(message);
 			}
 			else if (displayLocation == EDhApiDistantGeneratorProgressDisplayLocation.LOG)
 			{

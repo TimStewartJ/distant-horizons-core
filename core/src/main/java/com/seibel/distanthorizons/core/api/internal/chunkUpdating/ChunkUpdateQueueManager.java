@@ -179,7 +179,7 @@ public class ChunkUpdateQueueManager implements AutoCloseable
 			boolean showWarningInChat = Config.Common.Logging.Warning.showUpdateQueueOverloadedChatWarning.get();
 			if (showWarningInChat)
 			{
-				ClientApi.INSTANCE.queueChatMessage(message);
+				ClientApi.INSTANCE.queueSlowChatMessage(message);
 			}
 			
 			// Don't log warnings in singleplayer or in hosted LAN since it usually isn't a problem (and if it is it's easy to notice).

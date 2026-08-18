@@ -101,11 +101,11 @@ public class ClientNetworkState implements Closeable
 				
 				if (ModInfo.PROTOCOL_VERSION < event.protocolVersion)
 				{
-					ClientApi.INSTANCE.queueChatMessage(MinecraftTextFormat.ORANGE + "Distant Horizons: Your mod is outdated. Update to receive LODs on this server.");
+					ClientApi.INSTANCE.queueSlowChatMessage(MinecraftTextFormat.ORANGE + "Distant Horizons: Your mod is outdated. Update to receive LODs on this server.");
 				}
 				else
 				{
-					ClientApi.INSTANCE.queueChatMessage(MinecraftTextFormat.ORANGE + "Distant Horizons: The server's mod is outdated. Ask the server's owner to update.");
+					ClientApi.INSTANCE.queueSlowChatMessage(MinecraftTextFormat.ORANGE + "Distant Horizons: The server's mod is outdated. Ask the server's owner to update.");
 				}
 			}
 		});

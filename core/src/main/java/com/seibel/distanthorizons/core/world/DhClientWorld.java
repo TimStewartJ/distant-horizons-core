@@ -150,7 +150,7 @@ public class DhClientWorld extends AbstractDhWorld implements IDhClientWorld
 			String y = MinecraftTextFormat.YELLOW;
 			String cf = MinecraftTextFormat.CLEAR_FORMATTING;
 			
-			ClientApi.INSTANCE.queueChatMessage(
+			ClientApi.INSTANCE.queueSlowChatMessage(
 				r + "Distant Horizons: Client level loading failed." + cf + "\n" +
 				"Unable to load level ["+y+clientLevelWrapper.getDhIdentifier()+cf+"], LODs may not appear. See log for more information. \n" +
 				"");

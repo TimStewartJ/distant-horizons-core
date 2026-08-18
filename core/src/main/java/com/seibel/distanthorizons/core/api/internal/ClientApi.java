@@ -128,9 +128,10 @@ public class ClientApi
 	private boolean highVanillaRenderDistanceWarningPrinted = false;
 	private boolean deprecatedRendererWarningPrinted = false;
 	
-	private long lastChatMessageSentMsTime = 0L;
+	private long lastSlowChatMessageSentMsTime = 0L;
 	
-	private final Queue<String> chatMessageQueue = new LinkedBlockingQueue<>();
+	private final Queue<String> slowChatMessageQueue = new LinkedBlockingQueue<>();
+	private final Queue<String> fastChatMessageQueue = new LinkedBlockingQueue<>();
 	private final Queue<String> overlayMessageQueue = new LinkedBlockingQueue<>();
 	
 	public boolean rendererDisabledBecauseOfExceptions = false;
@@ -790,26 +791,53 @@ public class ClientApi
 		// this includes if the current build is a dev build
 		// and configuration warnings (IE Java memory amount and MC settings)
 		this.detectAndSendBootTimeWarnings();
-			
 		
-		// chat messages
-		while (!this.chatMessageQueue.isEmpty())
+		
+		// slow chat messages
 		{
-			// limit chat message rate so each one can be seen
-			// before being pushed off-screen
-			if (this.chatMessageSentRecently())
-			{
-				break;
-			}
-			this.lastChatMessageSentMsTime = System.currentTimeMillis();
+			// if for some reason we end up with a lot of messages in the queue (world gen)
+			// show everything to prevent the queue from growing infinitely
+			boolean chatQueueBackedUp = this.slowChatMessageQueue.size() > 25;
 			
-			String message = this.chatMessageQueue.poll();
-			if (message == null)
+			// chat messages
+			while (!this.slowChatMessageQueue.isEmpty())
 			{
-				// done to prevent potential null pointers
-				message = "";
+				// limit chat message rate so each one can be seen
+				// before being pushed off-screen
+				if (this.chatMessageSentRecently()
+					// unless the queue is backed up
+					&& !chatQueueBackedUp)
+				{
+					break;
+				}
+				
+				// last chat time is only tracked for slow messages
+				// to prevent ever sending any if a lot of fast messages are being sent
+				this.lastSlowChatMessageSentMsTime = System.currentTimeMillis();
+				
+				String message = this.slowChatMessageQueue.poll();
+				if (message == null)
+				{
+					// done to prevent potential null pointers
+					message = "";
+				}
+				MC_CLIENT.sendChatMessage(message);
 			}
-			MC_CLIENT.sendChatMessage(message);
+		}
+		
+		// fast chat messages
+		{
+			// chat messages
+			while (!this.fastChatMessageQueue.isEmpty())
+			{
+				String message = this.fastChatMessageQueue.poll();
+				if (message == null)
+				{
+					// done to prevent potential null pointers
+					message = "";
+				}
+				MC_CLIENT.sendChatMessage(message);
+			}
 		}
 		
 		// overlay messages
@@ -834,7 +862,7 @@ public class ClientApi
 			&& MC_CLIENT.playerExists())
 		{
 			this.isDevBuildMessagePrinted = true;
-			this.lastChatMessageSentMsTime = System.currentTimeMillis();
+			this.lastSlowChatMessageSentMsTime = System.currentTimeMillis();
 			
 			// remind the user that this is a development build
 			String message =
@@ -851,7 +879,7 @@ public class ClientApi
 			&& Config.Common.Logging.Warning.showLowMemoryWarningOnStartup.get())
 		{
 			this.lowMemoryWarningPrinted = true;
-			this.lastChatMessageSentMsTime = System.currentTimeMillis();
+			this.lastSlowChatMessageSentMsTime = System.currentTimeMillis();
 			
 			// 4 GB
 			long minimumRecommendedMemoryInBytes = 4L * 1_000_000_000L;
@@ -881,7 +909,7 @@ public class ClientApi
 			// DH generally doesn't need a vanilla render distance above 12 
 			if (MC_RENDER.getRenderDistance() > 12)
 			{
-				this.lastChatMessageSentMsTime = System.currentTimeMillis();
+				this.lastSlowChatMessageSentMsTime = System.currentTimeMillis();
 				
 				String message =
 					MinecraftTextFormat.YELLOW + "Distant Horizons: High vanilla render distance detected." + MinecraftTextFormat.CLEAR_FORMATTING + "\n" +
@@ -934,13 +962,13 @@ public class ClientApi
 	/** done to prevent sending a bunch of chat messages all at once, causing some to be missed. */
 	private boolean chatMessageSentRecently()
 	{
-		if (this.lastChatMessageSentMsTime == 0)
+		if (this.lastSlowChatMessageSentMsTime == 0)
 		{
 			// no static message has ever been sent
 			return false;
 		}
 		
-		long timeSinceLastMessage = System.currentTimeMillis() - this.lastChatMessageSentMsTime; 
+		long timeSinceLastMessage = System.currentTimeMillis() - this.lastSlowChatMessageSentMsTime; 
 		return timeSinceLastMessage <= MS_BETWEEN_WARNING_MESSAGES;
 	}
 	
@@ -949,10 +977,19 @@ public class ClientApi
 	 * Queues the given message to appear in chat the next valid frame.
 	 * Useful for queueing up messages that may be triggered before the user has loaded into the world. 
 	 */
-	public void queueChatMessage(String chatMessage) { this.chatMessageQueue.add(chatMessage); }
+	public void queueSlowChatMessage(String chatMessage) { this.slowChatMessageQueue.add(chatMessage); }
+	
+	/** 
+	 * Similar to {@link ClientApi#queueSlowChatMessage(String)}
+	 * however any chat messages queued here will be shown immediately
+	 * instead of having a delay between messages. <br><br>
+	 * 
+	 * This is good for logging or alerts.
+	 */
+	public void queueFastChatMessage(String chatMessage) { this.slowChatMessageQueue.add(chatMessage); }
 	
 	/**
-	 * Similar to {@link ClientApi#queueChatMessage(String)} but appears above the toolbar.
+	 * Similar to {@link ClientApi#queueSlowChatMessage(String)} but appears above the toolbar.
 	 */
 	public void queueOverlayMessage(String message) { this.overlayMessageQueue.add(message); }
 	

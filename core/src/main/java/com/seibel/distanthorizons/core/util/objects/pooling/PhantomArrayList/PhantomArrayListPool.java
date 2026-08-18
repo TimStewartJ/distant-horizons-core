@@ -214,7 +214,7 @@ public class PhantomArrayListPool
 							LOGGER.warn(message);
 							if (Config.Common.Logging.Warning.showPoolInsufficientMemoryWarning.get())
 							{
-								ClientApi.INSTANCE.queueChatMessage(message);
+								ClientApi.INSTANCE.queueSlowChatMessage(message);
 							}
 						}
 					}
