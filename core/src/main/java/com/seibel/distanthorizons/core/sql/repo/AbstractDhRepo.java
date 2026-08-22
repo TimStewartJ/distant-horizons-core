@@ -49,8 +49,12 @@ public abstract class AbstractDhRepo<TKey, TDTO extends IBaseDTO<TKey>> implemen
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
 	public static final String DEFAULT_DATABASE_TYPE = "jdbc:sqlite";
-	/** a value of 0 means there's no timeout */
-	public static final int TIMEOUT_SECONDS = 0;
+	/** 
+	 * a value of 0 is supposed to mean there is no timeout
+	 * but this doesn't appear to be the case for SQLite,
+	 * so we're just setting a large value and calling it a day.
+	 */
+	public static final int TIMEOUT_SECONDS = 600;
 	
 	private static final ConcurrentHashMap<AbstractDhRepo<?, ?>, String> ACTIVE_CONNECTION_STRINGS_BY_REPO = new ConcurrentHashMap<>();
 	private static final Set<String> CORRUPTED_DB_PATHS = Collections.newSetFromMap(new ConcurrentHashMap<>());
