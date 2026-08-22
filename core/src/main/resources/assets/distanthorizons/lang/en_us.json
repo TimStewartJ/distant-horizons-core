@@ -698,7 +698,11 @@
     "Lossy World Compression",
   "distanthorizons.config.common.lodBuilding.worldCompression.@tooltip":
     "How should block data be compressed when creating LOD data? \nThis setting will only affect new or updated LOD data, \nany data already generated when this setting is changed will be \nunaffected until it is modified or re-loaded. \n\nMost Accurate: Merge Same Blocks \nHighest Compression: Visually Equal",
-
+  "distanthorizons.config.common.lodBuilding.databaseSyncMode":
+    "Database Sync Mode",
+  "distanthorizons.config.common.lodBuilding.databaseSyncMode.@tooltip":
+    "Requires a level restart to apply. \n\nSetting this to a less strict mode increases DB read/write \nspeed at the cost of potential data loss/corruption if \nthe computer looses power \n(unexpected program shutdown should be safe for all options). \n\n§6FULL§r \nACID - data will never be lost or corrupted \nSlow \n\n§6NORMAL§r \nMay not be durable - some data may be lost on power loss \nFast \n\n§6OFF§r \ndatabase may be corrupted during power loss \nFaster",
+    
   
   "distanthorizons.config.common.lodBuilding.experimental":
     "Experimental",
@@ -1041,6 +1045,13 @@
     "None",
   "distanthorizons.config.enum.EDhApiBlocksToAvoid.NON_COLLIDING":
     "Non-Colliding",
+    
+  "distanthorizons.config.enum.EDhApiDatabaseSyncMode.FULL":
+    "Full",
+  "distanthorizons.config.enum.EDhApiDatabaseSyncMode.NORMAL":
+    "Normal",
+  "distanthorizons.config.enum.EDhApiDatabaseSyncMode.OFF":
+    "Off",
     
   "distanthorizons.config.enum.EDhApiServerFolderNameMode.NAME_ONLY":
     "Name Only",

@@ -20,6 +20,7 @@
 package com.seibel.distanthorizons.core.sql.repo;
 
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.enums.MinecraftTextFormat;
 import com.seibel.distanthorizons.core.jar.EPlatform;
 import com.seibel.distanthorizons.core.logging.DhLogger;
@@ -551,7 +552,18 @@ public abstract class AbstractDhRepo<TKey, TDTO extends IBaseDTO<TKey>> implemen
 		{
 			try
 			{
-				return DriverManager.getConnection(this.getConnectionString());
+				Connection connection = DriverManager.getConnection(this.getConnectionString());
+				
+				try (Statement statement = connection.createStatement())
+				{
+					statement.setQueryTimeout(TIMEOUT_SECONDS);
+					
+					// the synchronization mode must be set for each connection
+					int syncMode = Config.Common.LodBuilding.databaseSyncMode.get().value;
+					statement.execute("PRAGMA synchronous = "+syncMode+";");
+				}
+				
+				return connection;
 			}
 			catch (SQLException e)
 			{

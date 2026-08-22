@@ -1618,6 +1618,34 @@ public class Config
 					+ "")
 				.build();
 			
+			public static ConfigEntry<EDhApiDatabaseSyncMode> databaseSyncMode = new ConfigEntry.Builder<EDhApiDatabaseSyncMode>()
+				.set(EDhApiDatabaseSyncMode.NORMAL)
+				.comment(""
+					+ "Requires a level restart to apply. \n"
+					+ "\n"
+					+ "Setting this to a less strict mode increases DB read/write\n"
+					+ "speed at the cost of potential data loss/corruption if\n"
+					+ "the computer looses power \n"
+					+ "(unexpected program shutdown should be safe for all options).\n"
+					+ "\n"
+					+ EDhApiDatabaseSyncMode.FULL + " \n"
+					+ "ACID - data will never be lost or corrupted \n"
+					+ "Slow \n"
+					+ "At max throughput: ~2k saves per sec, ~70% disk usage \n"
+					+ "\n"
+					+ EDhApiDatabaseSyncMode.NORMAL + " \n"
+					+ "May not be durable - some data may be lost on power loss, but DB should be safe from corruption \n"
+					+ "Fast\n"
+					+ "At max throughput: ~14k saves per sec, ~40% disk usage \n"
+					+ "\n"
+					+ EDhApiDatabaseSyncMode.OFF + " \n"
+					+ "Not consistent - database may be corrupted during power loss \n"
+					+ "Very Fast\n"
+					+ "At max throughput: ~16k saves per sec, ~6% disk usage \n"
+					+ "\n"
+					+ "")
+				.build();
+			
 			public static ConfigCategory experimental = new ConfigCategory.Builder().set(Experimental.class).build();
 			
 			
