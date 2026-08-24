@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec2 TexCoord;
+in vec2 texCoord;
 
 out vec4 fragColor;
 
@@ -19,7 +19,7 @@ uniform float uEndFadeBlockDistance;
 vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj) 
 {
     // normalized device coordinates
-    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);
+    vec4 ndc = vec4(texCoord.xy, fragmentDepth, 1.0);
     ndc.xyz = ndc.xyz * 2.0 - 1.0;
 
     vec4 eyeCoord = invMvmProj * ndc;
@@ -33,9 +33,9 @@ vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj)
 void main() 
 {
     // includes both the vanilla chunks as well as DH
-    vec4 combinedMcDhColor = texture(uMcColorTexture, TexCoord);
+    vec4 combinedMcDhColor = texture(uMcColorTexture, texCoord);
     // just the DH render pass
-    vec4 dhColor = texture(uDhColorTexture, TexCoord);
+    vec4 dhColor = texture(uDhColorTexture, texCoord);
 
 
 
@@ -47,7 +47,7 @@ void main()
     }
     
     
-    float dhFragmentDepth = texture(uDhDepthTexture, TexCoord).r;
+    float dhFragmentDepth = texture(uDhDepthTexture, texCoord).r;
     vec3 dhVertexWorldPos = calcViewPosition(dhFragmentDepth, uDhInvMvmProj);
     float dhFragmentDistance = length(dhVertexWorldPos.xzy);
     
