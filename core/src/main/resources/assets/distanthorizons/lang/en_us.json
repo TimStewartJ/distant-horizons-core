@@ -187,6 +187,13 @@
 
 
 
+  "distanthorizons.config.client.advanced.graphics.enableAntiAliasing":
+    "Enable Anti-Aliasing",
+  "distanthorizons.config.client.advanced.graphics.enableAntiAliasing.@tooltip":
+    "Enabling Anti-Aliasing smooths edges and reduces flickering when moving.",
+
+
+
   "distanthorizons.config.client.advanced.graphics.genericRendering":
     "Generic Object Rendering",
   "distanthorizons.config.client.advanced.graphics.genericRendering.enableGenericRendering":

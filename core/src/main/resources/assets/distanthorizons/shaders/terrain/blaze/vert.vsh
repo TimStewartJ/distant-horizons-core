@@ -29,11 +29,32 @@ layout (std140) uniform vertSharedUniformBlock
     float uMircoOffset;
     float uEarthRadius;
     
+    float uFrameMod8;
+    float uViewWidth;
+    float uViewHeight;
+
     vec3 uCameraPos;
     mat4 uCombinedMatrix;
 };
 
 uniform sampler2D uLightMap;
+
+vec2 jitterOffsets[8] = vec2[8](
+    vec2( 0.125, -0.375),
+    vec2(-0.125,  0.375),
+    vec2( 0.625,  0.125),
+    vec2( 0.375, -0.625),
+    vec2(-0.625,  0.625),
+    vec2(-0.875, -0.125),
+    vec2( 0.375, -0.875),
+    vec2( 0.875,  0.875)
+);
+
+vec2 TAAJitter(vec2 coord, float w) 
+{
+    vec2 offset = jitterOffsets[int(uFrameMod8)] * (w / vec2(uViewWidth, uViewHeight));
+    return coord + offset;
+}
 
 /** 
  * LOD terrain Vertex Shader
@@ -87,4 +108,11 @@ void main()
     }
     
     gl_Position = uCombinedMatrix * vec4(vertexWorldPos, 1.0);
+    
+    // -1 if TAA is diabled
+    if (uFrameMod8 > 0)
+    {
+		// jittering the model around is necessary to smooth out TAA properly
+        gl_Position.xy = TAAJitter(gl_Position.xy, gl_Position.w);
+    }
 }

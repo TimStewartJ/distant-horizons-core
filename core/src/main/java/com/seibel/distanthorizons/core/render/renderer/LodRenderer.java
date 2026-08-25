@@ -69,6 +69,7 @@ public class LodRenderer
 	private IDhSsaoRenderer ssaoRenderer;
 	private IDhFogRenderer fogRenderer;
 	private IDhFarFadeRenderer farFadeRenderer;
+	private IDhAntiAliasRenderer antiAliasRenderer;
 	private AbstractDebugWireframeRenderer debugWireframeRenderer;
 	
 	
@@ -87,6 +88,7 @@ public class LodRenderer
 		this.ssaoRenderer = SingletonInjector.INSTANCE.get(IDhSsaoRenderer.class);
 		this.fogRenderer = SingletonInjector.INSTANCE.get(IDhFogRenderer.class);
 		this.farFadeRenderer = SingletonInjector.INSTANCE.get(IDhFarFadeRenderer.class);
+		this.antiAliasRenderer = SingletonInjector.INSTANCE.get(IDhAntiAliasRenderer.class);
 		this.debugWireframeRenderer = SingletonInjector.INSTANCE.get(AbstractDebugWireframeRenderer.class);
 	}
 	
@@ -273,11 +275,21 @@ public class LodRenderer
 				}
 				
 				// far plane clip fading
-				if (Config.Client.Advanced.Graphics.Quality.dhFadeFarClipPlane.get()
-					&& IRIS_ACCESSOR == null)
+				if (IRIS_ACCESSOR == null)
 				{
+					// far fading would probably break shaders
+					// but is necessary for Anti-aliasing to apply to the sky/surrounding pixels properly
+					
 					profiler.popPush("Fade Far Clip Fade");
 					this.farFadeRenderer.render(renderParams);
+				}
+				
+				// Anti-Aliasing
+				if (Config.Client.Advanced.Graphics.enableAntiAliasing.get()
+					&& IRIS_ACCESSOR == null) // AA should be handled by the shader
+				{
+					profiler.popPush("Anti-Aliasing");
+					this.antiAliasRenderer.render(renderParams);
 				}
 				
 				
@@ -312,15 +324,15 @@ public class LodRenderer
 				
 				
 				
-				//=============================//
-				// Apply to the MC Framebuffer //
-				//=============================//
+				//=========================//
+				// Apply to the MC Texture //
+				//=========================//
 				
 				boolean cancelApplyShader = ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeApplyShaderRenderEvent.class, renderParams.apiCopy);
 				if (!cancelApplyShader)
 				{
 					profiler.popPush("Apply to MC");
-					this.metaRenderer.applyToMcTexture(renderParams);
+					this.metaRenderer.copyToMcTexture(renderParams);
 				}
 				
 			}

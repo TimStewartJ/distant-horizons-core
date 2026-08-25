@@ -128,8 +128,11 @@ public class Config
 					.set(true)
 					.comment("Enable Screen Space Ambient Occlusion")
 					.build();
-				public static ConfigUISpacer ssaoSpacer = new ConfigUISpacer.Builder().build();
-				
+				public static ConfigEntry<Boolean> enableAntiAliasing = new ConfigEntry.Builder<Boolean>()
+					.set(true)
+					.comment("Enabling Anti-Aliasing smooths edges and reduces flickering when moving.")
+					.build();
+				public static ConfigUISpacer antiAliasingSpacer = new ConfigUISpacer.Builder().build();
 				
 				public static ConfigUiLinkedEntry quickEnableGenericRendering = new ConfigUiLinkedEntry(GenericRendering.enableGenericRendering);
 				public static ConfigCategory genericRendering = new ConfigCategory.Builder().set(GenericRendering.class).build();
@@ -320,14 +323,6 @@ public class Config
 							+ EDhApiMcRenderingFadeMode.NONE + ": Fastest, there will be a pronounced border between DH and MC rendering. \n"
 							+ EDhApiMcRenderingFadeMode.SINGLE_PASS + ": Fades after MC's transparent pass, opaque blocks underwater won't be faded. \n"
 							+ EDhApiMcRenderingFadeMode.DOUBLE_PASS + ": Slowest, fades after both MC's opaque and transparent passes, provides the smoothest transition. \n"
-							+ "")
-						.build();
-					
-					public static ConfigEntry<Boolean> dhFadeFarClipPlane = new ConfigEntry.Builder<Boolean>()
-						.set(true)
-						.comment(""
-							+ "Should DH fade out before reaching the far clip plane? \n"
-							+ "This is helpful to prevent DH clouds from cutting off in the distance. \n"
 							+ "")
 						.build();
 					
