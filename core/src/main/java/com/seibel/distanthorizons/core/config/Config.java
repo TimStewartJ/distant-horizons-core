@@ -941,6 +941,8 @@ public class Config
 							+ "A comma separated list of dimension resource locations where DH won't render. \n"
 							+ "\n"
 							+ "Example: \"minecraft:the_nether,minecraft:the_end\"\n"
+							+ "For Minecraft 1.12.2 and older: \n"
+							+ "Open the F3 screen and copy the dimension_name:ID shown in yellow. Example: \"overworld:0\"\n"
 							+ "\n"
 							+ "Note:\n"
 							+ "Some DH settings will be disabled and/or changed to improve \n"
