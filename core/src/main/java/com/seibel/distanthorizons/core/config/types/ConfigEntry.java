@@ -132,7 +132,15 @@ public class ConfigEntry<T> extends AbstractConfigBase<T>
 	public void setApiValue(T newApiValue)
 	{
 		this.apiValue = newApiValue;
-		this.apiValueLastSetMs = System.currentTimeMillis();
+		
+		if (newApiValue != null)
+		{
+			// only update the last set time if we're changing to a new value,
+			// otherwise constant null sets 
+			// (which may occur if the API isn't being used)
+			// incorrectly causes the UI to think the API was used recently 
+			this.apiValueLastSetMs = System.currentTimeMillis();
+		}
 		
 		synchronized (this.listenerList)
 		{
