@@ -601,10 +601,9 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 						String blockString = "[NULL BLOCK]"; // shouldn't normally happen unless there is an issue with getting the terrain at the given position
 						if (rayCast.payload.dataPoint.blockStateWrapper != null)
 						{
-							if (!rayCast.payload.dataPoint.blockStateWrapper.isAir() 
-								&& rayCast.payload.dataPoint.blockStateWrapper.getWrappedMcObject() != null)
+							if (!rayCast.payload.dataPoint.blockStateWrapper.isAir())
 							{
-								blockString = rayCast.payload.dataPoint.blockStateWrapper.getWrappedMcObject().toString();
+								blockString = rayCast.payload.dataPoint.blockStateWrapper.getSerialString();
 							}
 							else
 							{
