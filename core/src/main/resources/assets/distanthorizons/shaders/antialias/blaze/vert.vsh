@@ -4,7 +4,7 @@ in vec2 vPosition;
 
 out vec2 texCoord;
 
-// DH vert fade test
+// DH anti-alias
 void main()
 {
     gl_Position = vec4(vPosition, 1.0, 1.0);

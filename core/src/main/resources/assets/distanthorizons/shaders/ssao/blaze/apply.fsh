@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec2 TexCoord;
+in vec2 texCoord;
 
 out vec4 fragColor;
 
@@ -67,7 +67,7 @@ void main()
 {
     fragColor = vec4(1.0);
     
-    float fragmentDepth = textureLod(uSourceDepthTexture, TexCoord, 0).r;
+    float fragmentDepth = textureLod(uSourceDepthTexture, texCoord, 0).r;
 
     // a fragment depth of "1" means the fragment wasn't drawn to,
     // we only want to apply SSAO to LODs, not to the sky outside the LODs
@@ -76,7 +76,7 @@ void main()
         if (uBlurRadius > 0) 
         {
             float fragmentDepthLinear = linearizeDepth(fragmentDepth);
-            fragColor.a = BilateralGaussianBlur(TexCoord, fragmentDepthLinear, 1.6);
+            fragColor.a = BilateralGaussianBlur(texCoord, fragmentDepthLinear, 1.6);
         }
         else 
         {

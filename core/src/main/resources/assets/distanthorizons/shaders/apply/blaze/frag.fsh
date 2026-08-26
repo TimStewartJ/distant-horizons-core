@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec2 TexCoord;
+in vec2 texCoord;
 
 out vec4 fragColor;
 
@@ -20,7 +20,7 @@ uniform sampler2D uSourceDepthTexture;
 void main()
 {
     fragColor = vec4(0.0);
-    float fragmentDepth = texture(uSourceDepthTexture, TexCoord).r;
+    float fragmentDepth = texture(uSourceDepthTexture, texCoord).r;
     
     bool drawnTo;
     if (uIsReverseZDepth)
@@ -36,7 +36,7 @@ void main()
     // only update fragments that were drawn to
     if (drawnTo)
     {
-        fragColor = texture(uSourceColorTexture, TexCoord);
+        fragColor = texture(uSourceColorTexture, texCoord);
     }
     else
     {

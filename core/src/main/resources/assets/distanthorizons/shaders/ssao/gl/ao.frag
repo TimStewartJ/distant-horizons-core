@@ -5,7 +5,7 @@
 
 #define saturate(x) (clamp((x), 0.0, 1.0))
 
-in vec2 TexCoord;
+in vec2 texCoord;
 
 out vec4 fragColor;
 
@@ -92,13 +92,13 @@ float GetSpiralOcclusion(const in vec2 uv, const in vec3 viewPos, const in vec3 
 
 void main() 
 {
-    float fragmentDepth = textureLod(uDepthMap, TexCoord, 0).r;
+    float fragmentDepth = textureLod(uDepthMap, texCoord, 0).r;
     float occlusion = 0.0;
     
     // Do not apply to sky
     if (fragmentDepth < 1.0) 
     {
-        vec3 viewPos = calcViewPosition(vec3(TexCoord, fragmentDepth));
+        vec3 viewPos = calcViewPosition(vec3(texCoord, fragmentDepth));
         
         // fading is done to prevent banding/noise
         // at super far distance
@@ -114,7 +114,7 @@ void main()
             #endif
 
             viewNormal = normalize(viewNormal);
-            occlusion = GetSpiralOcclusion(TexCoord, viewPos, viewNormal);
+            occlusion = GetSpiralOcclusion(texCoord, viewPos, viewNormal);
             
             // linearly fade with distance
             occlusion *= (fadeDistance - distanceFromCamera) / fadeDistance;

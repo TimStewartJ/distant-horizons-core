@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec2 TexCoord;
+in vec2 texCoord;
 
 out vec4 fragColor;
 
@@ -34,7 +34,7 @@ layout (std140) uniform fragUniformBlock
 vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj)
 {
     // normalized device coordinates
-    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);
+    vec4 ndc = vec4(texCoord.xy, fragmentDepth, 1.0);
     if (uIsReverseZDepth)
     {
         // Z already in [0,1], don't remap
@@ -58,9 +58,9 @@ vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj)
 void main() 
 {
     // includes both the vanilla chunks as well as DH
-    vec4 combinedMcDhColor = texture(uCombinedMcDhColorTexture, TexCoord);
+    vec4 combinedMcDhColor = texture(uCombinedMcDhColorTexture, texCoord);
     // just the DH render pass
-    vec4 dhColor = texture(uDhColorTexture, TexCoord);
+    vec4 dhColor = texture(uDhColorTexture, texCoord);
     
     // completely remove the MC render pass to only show LODs
     // useful for debugging/troubleshooting, but doesn't improve performance since MC is still rendering
@@ -78,8 +78,8 @@ void main()
         dhColor = combinedMcDhColor;
     }
     
-    float mcFragmentDepth = texture(uMcDepthTexture, TexCoord).r;
-    float dhFragmentDepth = texture(uDhDepthTexture, TexCoord).r;
+    float mcFragmentDepth = texture(uMcDepthTexture, texCoord).r;
+    float dhFragmentDepth = texture(uDhDepthTexture, texCoord).r;
     vec3 dhVertexWorldPos = calcViewPosition(dhFragmentDepth, uDhInvMvmProj);
 
     // we only want to fade vanilla rendered objects, not to the sky or LODs

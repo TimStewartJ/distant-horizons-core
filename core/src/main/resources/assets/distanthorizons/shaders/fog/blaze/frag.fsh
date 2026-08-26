@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec2 TexCoord;
+in vec2 texCoord;
 
 out vec4 fragColor;
 
@@ -75,7 +75,7 @@ float exponentialSquaredFog(float x, float fogStart, float fogLength, float fogM
  */
 void main()
 {
-    float fragmentDepth = texture(uDhDepthTexture, TexCoord).r;
+    float fragmentDepth = texture(uDhDepthTexture, texCoord).r;
     fragColor = vec4(uFogColor.rgb, 0.0);
 
     // a fragment depth of "1" means the fragment wasn't drawn to,
@@ -121,7 +121,7 @@ void main()
             // a uniform we don't have to worry about GLSL optimizing away different
             // options when testing, causing a bunch of headaches if we just want to render the screen red.
 
-            float depthValue = textureLod(uDhDepthTexture, TexCoord, 0).r;
+            float depthValue = textureLod(uDhDepthTexture, texCoord, 0).r;
             fragColor.rgb = vec3(depthValue); // Convert depth value to grayscale color
             fragColor.a = 1.0;
         }
@@ -141,7 +141,7 @@ void main()
 vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj)
 {
     // normalized device coordinates
-    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);
+    vec4 ndc = vec4(texCoord.xy, fragmentDepth, 1.0);
     if (uIsReverseZDepth)
     {
         // Z already in [0,1], don't remap

@@ -4,7 +4,7 @@
 
 #define saturate(x) (clamp((x), 0.0, 1.0))
 
-in vec2 TexCoord;
+in vec2 texCoord;
 
 out vec4 fragColor;
 
@@ -49,7 +49,7 @@ float InterleavedGradientNoise(const in vec2 pixel)
 vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj)
 {
     // normalized device coordinates
-    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);
+    vec4 ndc = vec4(texCoord.xy, fragmentDepth, 1.0);
     if (uIsReverseZDepth)
     {
         // Z already in [0,1], don't remap
@@ -132,7 +132,7 @@ float GetSpiralOcclusion(const in vec2 uv, const in vec3 viewPos, const in vec3 
 
 void main() 
 {
-    float fragmentDepth = textureLod(uDhDepthTexture, TexCoord, 0).r;
+    float fragmentDepth = textureLod(uDhDepthTexture, texCoord, 0).r;
     float occlusion = 0.0;
     
     bool isGround;
@@ -158,7 +158,7 @@ void main()
         {
             vec3 viewNormal = cross(dFdx(viewPos.xyz), dFdy(viewPos.xyz));
             viewNormal = normalize(viewNormal);
-            occlusion = GetSpiralOcclusion(TexCoord, viewPos, viewNormal);
+            occlusion = GetSpiralOcclusion(texCoord, viewPos, viewNormal);
             
             // linearly fade with distance
             occlusion *= (fadeDistance - distanceFromCamera) / fadeDistance;

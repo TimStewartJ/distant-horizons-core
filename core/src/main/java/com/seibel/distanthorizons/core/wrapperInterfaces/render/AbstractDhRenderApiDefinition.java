@@ -59,6 +59,7 @@ public abstract class AbstractDhRenderApiDefinition implements IBindable
 	public abstract IDhSsaoRenderer getSsaoRenderer();
 	public abstract IDhFogRenderer getFogRenderer();
 	public abstract IDhFarFadeRenderer getFarFadeRenderer();
+	public abstract IDhAntiAliasRenderer getAntiAliasRenderer();
 	public abstract AbstractDebugWireframeRenderer getDebugWireframeRenderer();
 	public abstract IDhVanillaFadeRenderer getVanillaFadeRenderer();
 	public abstract IDhTestTriangleRenderer getTestTriangleRenderer();
@@ -77,6 +78,7 @@ public abstract class AbstractDhRenderApiDefinition implements IBindable
 		SingletonInjector.INSTANCE.bind(IDhSsaoRenderer.class, this.getSsaoRenderer());
 		SingletonInjector.INSTANCE.bind(IDhFogRenderer.class, this.getFogRenderer());
 		SingletonInjector.INSTANCE.bind(IDhFarFadeRenderer.class, this.getFarFadeRenderer());
+		SingletonInjector.INSTANCE.bind(IDhAntiAliasRenderer.class, this.getAntiAliasRenderer());
 		SingletonInjector.INSTANCE.bind(AbstractDebugWireframeRenderer.class, this.getDebugWireframeRenderer());
 		SingletonInjector.INSTANCE.bind(IDhVanillaFadeRenderer.class, this.getVanillaFadeRenderer());
 		SingletonInjector.INSTANCE.bind(IDhTestTriangleRenderer.class, this.getTestTriangleRenderer());

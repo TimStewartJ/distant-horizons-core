@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec2 TexCoord;
+in vec2 texCoord;
 
 out vec4 fragColor;
 
@@ -19,9 +19,9 @@ void main()
 
     // a fragment depth of "1" means the fragment wasn't drawn to,
     // only update fragments that were drawn to
-    float fragmentDepth = textureLod(uDepthTexture, TexCoord, 0).r;
+    float fragmentDepth = textureLod(uDepthTexture, texCoord, 0).r;
     if (fragmentDepth != 1)
     {
-        fragColor = texture(uColorTexture, TexCoord);
+        fragColor = texture(uColorTexture, texCoord);
     }
 }

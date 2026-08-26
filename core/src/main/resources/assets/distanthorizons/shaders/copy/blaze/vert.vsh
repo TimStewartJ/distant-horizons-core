@@ -2,11 +2,11 @@
 
 in vec2 vPosition;
 
-out vec2 TexCoord;
+out vec2 texCoord;
 
 // DH copy
 void main()
 {
     gl_Position = vec4(vPosition, 1.0, 1.0);
-    TexCoord = vPosition.xy * 0.5 + 0.5;
+    texCoord = vPosition.xy * 0.5 + 0.5;
 }
