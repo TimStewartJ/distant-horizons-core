@@ -708,7 +708,7 @@
   "distanthorizons.config.common.lodBuilding.databaseSyncMode":
     "Database Sync Mode",
   "distanthorizons.config.common.lodBuilding.databaseSyncMode.@tooltip":
-    "Requires a level restart to apply. \n\nSetting this to a less strict mode increases DB read/write \nspeed at the cost of potential data loss/corruption if \nthe computer looses power \n(unexpected program shutdown should be safe for all options). \n\n§6FULL§r \nACID - data will never be lost or corrupted \nSlow \n\n§6NORMAL§r \nMay not be durable - some data may be lost on power loss \nFast \n\n§6OFF§r \ndatabase may be corrupted during power loss \nFaster",
+    "Requires a level restart to apply. \n\nSetting this to a less strict mode increases DB read/write \nspeed at the cost of potential data loss/corruption if \nthe computer looses power \n(unexpected program shutdown should be safe for all options). \n\n§6FULL§r \nACID - data will never be lost or corrupted \nSlow \n\n§6NORMAL§r \nSome data may be lost on power loss, but database shouldn't be corrupted. \nFast \n\n§6OFF§r \nDatabase may be corrupted during power loss \nFaster",
     
   
   "distanthorizons.config.common.lodBuilding.experimental":
