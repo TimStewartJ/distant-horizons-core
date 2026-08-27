@@ -1692,15 +1692,43 @@ public class Config
 					+ "")
 				.build();
 			
-			//public static ConfigCategory experimental = new ConfigCategory.Builder().set(Experimental.class).build();
+			public static ConfigCategory experimental = new ConfigCategory.Builder().set(Experimental.class).build();
 			
 			
 			
-			//public static class Experimental
-			//{
-			//	public static ConfigUIComment experimentalHeader = new ConfigUIComment.Builder().setParentConfigClass(Experimental.class).build();
-			//	
-			//}
+			public static class Experimental
+			{
+				public static ConfigUIComment experimentalHeader = new ConfigUIComment.Builder().setParentConfigClass(Experimental.class).build();
+				
+				public static ConfigEntry<Boolean> upsampleLowerDetailLodsToFillHoles = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment(""
+						+ "Tellus fork. Copy generated lower-detail LODs down into every finer \n"
+						+ "section and mark the finest sections for the chunk regeneration pass. \n"
+						+ "\n"
+						+ "Official Distant Horizons always does this. It fills holes while \n"
+						+ "approaching coarse terrain, but writes every descendant section \n"
+						+ "to the database and regenerates every finest section in range. \n"
+						+ "[keepLowerDetailLodsUntilChildrenHaveData] keeps coarse terrain \n"
+						+ "visible without those writes. \n"
+						+ "")
+					.build();
+				
+				public static ConfigEntry<Boolean> keepLowerDetailLodsUntilChildrenHaveData = new ConfigEntry.Builder<Boolean>()
+					.set(true)
+					.comment(""
+						+ "Tellus fork. Keep rendering a coarse LOD until all four of its finer \n"
+						+ "children actually contain LOD data. \n"
+						+ "\n"
+						+ "Upstream hides the coarse LOD as soon as the children have uploaded \n"
+						+ "buffers, which an ungenerated (empty) section does too, so with a \n"
+						+ "coarse-first generator the area turns into a hole until the fine tiles are \n"
+						+ "generated. This keeps the coarse terrain visible instead. \n"
+						+ "Sections hidden this way are still queued for generation. \n"
+						+ "")
+					.build();
+				
+			}
 			
 		}
 		
