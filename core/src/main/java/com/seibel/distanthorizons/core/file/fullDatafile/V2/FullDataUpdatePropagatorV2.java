@@ -126,7 +126,10 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 				
 				this.runParentUpdates(executor, targetBlockPos);
 				
-				this.runChildUpdates(executor, targetBlockPos);
+				if (Config.Common.LodBuilding.Experimental.upsampleLowerDetailLodsToFillHoles.get())
+				{
+					this.runChildUpdates(executor, targetBlockPos);
+				}
 				
 				this.tryQueueRegeneration(targetBlockPos);
 			}
