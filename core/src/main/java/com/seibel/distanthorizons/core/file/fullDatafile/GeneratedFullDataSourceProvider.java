@@ -68,7 +68,7 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 	public static final PhantomArrayListPool ARRAY_LIST_POOL = new PhantomArrayListPool("Generated Provider");
 	
 	
-	private final AtomicReference<IFullDataSourceRetrievalQueue> worldGenQueueRef = new AtomicReference<>(null);
+	public final AtomicReference<IFullDataSourceRetrievalQueue> worldGenQueueRef = new AtomicReference<>(null);
 	private final ArrayList<IOnWorldGenCompleteListener> onWorldGenTaskCompleteListeners = new ArrayList<>();
 	
 	protected final DelayedDataSourceSaveCache delayedFullDataSourceSaveCache = new DelayedDataSourceSaveCache(this::onDataSourceSaveAsync, 10_000);
@@ -325,7 +325,22 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 	
 	
 	@Override
-	public LongArrayList getPositionsToRetrieve(long pos)
+	public LongArrayList getPositionsToRetrieve(long pos) 
+	{
+		IFullDataSourceRetrievalQueue worldGenQueue = this.worldGenQueueRef.get();
+		if (worldGenQueue == null)
+		{
+			return null;
+		}
+		
+		byte lowestGeneratorDetailLevel = (byte) Math.min(
+			worldGenQueue.lowestDataDetail() + DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL,
+			DhSectionPos.getDetailLevel(pos));
+		
+		return this.getPositionsToRetrieve(pos, lowestGeneratorDetailLevel, EDhApiWorldGenerationStep.FEATURES); 
+	}
+	@Override
+	public LongArrayList getPositionsToRetrieve(long pos, byte generatorDetailLevel, EDhApiWorldGenerationStep requiredWorldGenStep)
 	{
 		IFullDataSourceRetrievalQueue worldGenQueue = this.worldGenQueueRef.get();
 		if (worldGenQueue == null)
@@ -348,8 +363,10 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 					// check if any positions are ungenerated
 					for (int i = 0; i < columnGenStepArray.size(); i++)
 					{
-						if (columnGenStepArray.getByte(i) == EDhApiWorldGenerationStep.EMPTY.value
-							|| columnGenStepArray.getByte(i) == EDhApiWorldGenerationStep.DOWN_SAMPLED.value)
+						byte genStepByte = columnGenStepArray.getByte(i);
+						if (genStepByte == EDhApiWorldGenerationStep.EMPTY.value
+							|| genStepByte == EDhApiWorldGenerationStep.DOWN_SAMPLED.value
+							|| genStepByte <= requiredWorldGenStep.value)
 						{
 							positionFullyGenerated = false;
 							break;
@@ -369,11 +386,7 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 		// this section is missing one or more columns, queue the missing ones for generation.
 		LongArrayList generationList = new LongArrayList();
 		
-		byte lowestGeneratorDetailLevel = (byte) Math.min(
-			worldGenQueue.lowestDataDetail() + DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL,
-			DhSectionPos.getDetailLevel(pos));
-		
-		DhSectionPos.forEachChildAtDetailLevel(pos, lowestGeneratorDetailLevel, (genPos) ->
+		DhSectionPos.forEachChildAtDetailLevel(pos, generatorDetailLevel, (genPos) ->
 		{
 			if (!this.repo.existsWithKey(genPos))
 			{
@@ -414,7 +427,8 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 							}
 							
 							if (currentMinWorldGenStep == EDhApiWorldGenerationStep.EMPTY 
-								|| currentMinWorldGenStep == EDhApiWorldGenerationStep.DOWN_SAMPLED)
+								|| currentMinWorldGenStep == EDhApiWorldGenerationStep.DOWN_SAMPLED
+								|| currentMinWorldGenStep.value < requiredWorldGenStep.value)
 							{
 								// queue the task
 								break checkWorldGenLoop;
@@ -424,7 +438,8 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 				}
 				
 				if (currentMinWorldGenStep != EDhApiWorldGenerationStep.EMPTY
-					&& currentMinWorldGenStep != EDhApiWorldGenerationStep.DOWN_SAMPLED)
+					&& currentMinWorldGenStep != EDhApiWorldGenerationStep.DOWN_SAMPLED
+					&& currentMinWorldGenStep.value >= requiredWorldGenStep.value)
 				{
 					// no world gen needed for this position
 					return;

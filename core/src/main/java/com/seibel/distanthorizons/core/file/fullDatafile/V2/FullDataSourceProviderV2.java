@@ -20,6 +20,7 @@
 package com.seibel.distanthorizons.core.file.fullDatafile.V2;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiDataCompressionMode;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
@@ -400,7 +401,9 @@ public class FullDataSourceProviderV2 implements IDebugRenderable, AutoCloseable
 	 */
 	@Nullable
 	public LongArrayList getPositionsToRetrieve(long pos) { return null; }
-		
+	@Nullable
+	public LongArrayList getPositionsToRetrieve(long pos, byte generatorDetailLevel, EDhApiWorldGenerationStep requiredWorldGenStep) { return null; }	
+	
 	/** @return null if the position couldn't be queued */
 	@Nullable
 	public CompletableFuture<DataSourceRetrievalResult> queuePositionForRetrieval(Long genPos) { return null; }

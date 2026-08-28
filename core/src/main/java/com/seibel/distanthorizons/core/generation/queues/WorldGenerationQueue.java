@@ -272,6 +272,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 			{ 
 				DataSourceRetrievalTask task = entry.getValue();
 				int distance = DhSectionPos.getCenterBlockPos(task.pos).chebyshevDist(targetPos);
+				distance /= DhSectionPos.getDetailLevel(task.pos); // generate low detail LODs first 
 				return new TaskDistancePair(entry.getValue(), distance);
 			},
 			// find the closest task

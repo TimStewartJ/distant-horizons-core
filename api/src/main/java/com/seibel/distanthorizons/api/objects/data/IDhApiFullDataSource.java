@@ -1,5 +1,6 @@
 package com.seibel.distanthorizons.api.objects.data;
 
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
 import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 
 import java.util.List;
@@ -27,8 +28,12 @@ public interface IDhApiFullDataSource
 	 *          
 	 * @throws IndexOutOfBoundsException if the relative positions are negative or outside the bounds of this data source.
 	 */
+	@Deprecated
 	List<DhApiTerrainDataPoint> setApiDataPointColumn(int relX, int relZ, List<DhApiTerrainDataPoint> columnDataPoints)
 			throws IndexOutOfBoundsException, IllegalArgumentException;
+	
+	List<DhApiTerrainDataPoint> setApiDataPointColumn(int relX, int relZ, EDhApiWorldGenerationStep worldGenStep, List<DhApiTerrainDataPoint> columnDataPoints)
+		throws IndexOutOfBoundsException, IllegalArgumentException;
 	
 	/** 
 	 * @param relX can be in the range 0 to {@link IDhApiFullDataSource#getWidthInDataColumns()}-1 (both inclusive)
