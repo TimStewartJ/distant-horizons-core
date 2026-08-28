@@ -285,10 +285,18 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 				ColumnRenderBufferBuilder.makeLodRenderData(lodQuadBuilder, thisRenderSource, this.clientLevelWrapper, adjacentRenderSections, adjIsSameDetailLevel);
 				return lodQuadBuilder;
 			}
+			catch (CancellationException ignored)
+			{
+				return null;
+			}
 			catch (Exception e)
 			{
 				LOGGER.error("Unexpected error while loading LodRenderSection [" + DhSectionPos.toString(this.pos) + "] adjacent data, Error: [" + e.getMessage() + "].", e);
 			}
+		}
+		catch (CancellationException ignored)
+		{
+			return null;
 		}
 		catch (Exception e)
 		{
