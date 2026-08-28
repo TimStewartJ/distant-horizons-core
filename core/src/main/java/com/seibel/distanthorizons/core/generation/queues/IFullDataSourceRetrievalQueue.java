@@ -117,6 +117,15 @@ public interface IFullDataSourceRetrievalQueue extends Closeable
 	 */
 	boolean requestPosExistsWhere(DhSectionPos.IPrimitiveLongConsumer returnTrueIf);
 	
+	/**
+	 * Returns a coarser priority position that should be queued before {@code requestedPos},
+	 * or {@code requestedPos} when no priority ancestor is available.
+	 */
+	default long getPriorityRetrievalPos(long requestedPos)
+	{
+		return requestedPos;
+	}
+
 	CompletableFuture<DataSourceRetrievalResult> submitRetrievalTask(long pos, byte requiredDataDetail);
 	
 	//endregion

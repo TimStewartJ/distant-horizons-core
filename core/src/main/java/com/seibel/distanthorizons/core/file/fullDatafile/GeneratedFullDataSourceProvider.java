@@ -315,6 +315,19 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 			return null;
 		}
 		
+		long priorityPos = worldGenQueue.getPriorityRetrievalPos(genPos);
+		if (priorityPos != genPos && !this.queuedRetrievalFutureByPos.containsKey(priorityPos))
+		{
+			this.queueSinglePositionForRetrieval(worldGenQueue, priorityPos);
+		}
+		
+		return this.queueSinglePositionForRetrieval(worldGenQueue, genPos);
+	}
+	
+	private CompletableFuture<DataSourceRetrievalResult> queueSinglePositionForRetrieval(
+		IFullDataSourceRetrievalQueue worldGenQueue,
+		long genPos)
+	{
 		CompletableFuture<DataSourceRetrievalResult> worldGenFuture = this.queuedRetrievalFutureByPos.compute(genPos, (newGenPos, existingFuture) -> 
 		{
 			if (existingFuture != null)
