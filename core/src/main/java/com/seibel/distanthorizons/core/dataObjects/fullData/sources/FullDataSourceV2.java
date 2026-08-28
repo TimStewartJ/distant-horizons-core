@@ -130,7 +130,7 @@ public class FullDataSourceV2
 	//==============//
 	// constructors //
 	//==============//
-	//region
+	//region constructors
 	
 	public static FullDataSourceV2 createFromChunk(ILevelWrapper levelWrapper, IChunkWrapper chunkWrapper) { return LodDataBuilder.createFromChunk(levelWrapper, chunkWrapper); }
 	
@@ -284,7 +284,7 @@ public class FullDataSourceV2
 	//=========//
 	// getters //
 	//=========//
-	//region
+	//region getters
 	
 	public LongArrayList getColumnAtRelPos(int relX, int relZ) throws IndexOutOfBoundsException 
 	{ return this.dataPoints[relativePosToIndex(relX, relZ)]; }
@@ -369,7 +369,7 @@ public class FullDataSourceV2
 	//==========//
 	// updating //
 	//==========//
-	//region
+	//region updating
 	
 	public boolean updateFromDataSource(@NotNull FullDataSourceV2 inputDataSource)
 	{
@@ -1203,7 +1203,7 @@ public class FullDataSourceV2
 	//===================//
 	// adjacent clearing //
 	//===================//
-	//region
+	//region adjacent clearing
 	
 	/** Removes any non-adjacent data from the given direction. */
 	public void clearAllNonAdjData(EDhDirection direction)
@@ -1239,7 +1239,7 @@ public class FullDataSourceV2
 	//================//
 	// helper methods //
 	//================//
-	//region
+	//region helper methods
 	
 	/** 
 	 * Usually this should just be used internally, but there may be instances
@@ -1338,7 +1338,7 @@ public class FullDataSourceV2
 	//=====================//
 	// setters and getters //
 	//=====================//
-	//region
+	//region setters and getters
 	
 	public long getPos() { return this.pos; }
 	
@@ -1375,7 +1375,7 @@ public class FullDataSourceV2
 	//=============//
 	// API methods //
 	//=============//
-	//region
+	//region API methods
 	
 	public void setRunApiSetterValidation(boolean runValidation) { this.runApiSetterValidation = runValidation; }
 	
@@ -1430,7 +1430,7 @@ public class FullDataSourceV2
 	//============//
 	// unit tests //
 	//============//
-	//region
+	//region unit tests
 	
 	public PhantomArrayListCheckout getPhantomArrayCheckoutForUnitTesting()
 	{ return this.pooledArraysCheckout; }
@@ -1442,7 +1442,7 @@ public class FullDataSourceV2
 	//================//
 	// base overrides //
 	//================//
-	//region
+	//region base overrides
 	
 	@Override
 	public String toString() { return DhSectionPos.toString(this.pos); }
