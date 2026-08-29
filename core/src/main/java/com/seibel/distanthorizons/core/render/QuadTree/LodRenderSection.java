@@ -450,8 +450,8 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 	public String toString()
 	{
 		return  "pos=[" + DhSectionPos.toString(this.pos) + "] " +
-				"enabled=[" + this.renderingEnabled + "] " +
-				"canRender=[" + (this.renderBufferContainer != null) + "] " +	
+				"enabled=[" + this.getRenderingEnabled() + "] " +
+				"canRender=[" + this.canRender() + "] " +	
 				"uploading=[" + this.gpuUploadInProgress() + "] "
 				;
 	}
