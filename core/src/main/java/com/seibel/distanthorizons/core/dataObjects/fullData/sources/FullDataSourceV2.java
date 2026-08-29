@@ -554,7 +554,7 @@ public class FullDataSourceV2
 				}
 				
 				
-				// copy over the new data
+				// copy over the new data, this is necessary to prevent remapping issues
 				this.dataPoints[index].clear();
 				this.dataPoints[index].addAll(inputDataArray);
 				this.remapDataColumn(index, remappedIds);
@@ -656,6 +656,7 @@ public class FullDataSourceV2
 				
 				
 				this.dataPoints[recipientIndex] = mergedInputDataArray;
+				// copy over the new data, this is necessary to prevent remapping issues
 				this.remapDataColumn(recipientIndex, remappedIds);
 				
 				if (RUN_DATA_ORDER_VALIDATION)
@@ -1116,7 +1117,11 @@ public class FullDataSourceV2
 				if (downSampleColumn)
 				{
 					LongArrayList inputDataArray = inputDataSource.dataPoints[inputIndex];
-					this.dataPoints[recipientIndex] = inputDataArray;
+					
+					// copy over the new data, this is necessary to prevent remapping issues
+					this.dataPoints[recipientIndex].clear();
+					this.dataPoints[recipientIndex].addAll(inputDataArray);
+					
 					this.remapDataColumn(recipientIndex, remappedIds);
 					
 					if (RUN_DATA_ORDER_VALIDATION)
