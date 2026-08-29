@@ -51,17 +51,21 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 	//=============//
 	// constructor //
 	//=============//
+	//region
 	
 	public FullDataSourceV2Repo(String databaseType, File databaseFile) throws SQLException, IOException
 	{
 		super(databaseType, databaseFile, FullDataSourceV2DTO.class);
 	}
 	
+	//endregion
+	
 	
 	
 	//===========//
 	// overrides //
 	//===========//
+	//region
 	
 	@Override 
 	public String getTableName() { return "FullData"; }
@@ -280,11 +284,14 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		return statement;
 	}
 	
+	//endregion
+	
 	
 	
 	//=================//
 	// partial selects //
 	//=================//
+	//region
 	
 	private final String getAdjForDirectionSqlTemplate =
 			"SELECT \n" +
@@ -367,11 +374,14 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		}
 	}
 	
+	//endregion
+	
 	
 	
 	//=========//
 	// updates //
 	//=========//
+	//region
 	
 	/** should be be very similar to {@link FullDataSourceV2Repo#setApplyToChildrenSql} */
 	private final String setApplyToParentSql = 
@@ -557,11 +567,14 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		}
 	}
 	
+	//endregion
+	
 	
 	
 	//=============//
 	// multiplayer //
 	//=============//
+	//region
 	
 	private final String getTimestampForPosSql =
 			"SELECT LastModifiedUnixDateTime " +
@@ -649,11 +662,14 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		}
 	}
 	
+	//endregion
+	
 	
 	
 	//===================//
 	// compression tests //
 	//===================//
+	//region
 	
 	private final String getAllPositionsSql = 
 			"select DetailLevel, PosX, PosZ " +
@@ -757,11 +773,14 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		}
 	}
 	
+	//endregion
+	
 	
 	
 	//================//
 	// helper methods //
 	//================//
+	//region
 	
 	private static ByteArrayList putAllBytes(@Nullable InputStream inputStream, @Nullable ByteArrayList existingArrayList) throws IOException
 	{
@@ -791,6 +810,8 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		
 		return existingArrayList;
 	}
+	
+	//endregion
 	
 	
 	
