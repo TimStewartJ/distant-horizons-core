@@ -7,12 +7,14 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
 import com.seibel.distanthorizons.core.generation.queues.IFullDataSourceRetrievalQueue;
 import com.seibel.distanthorizons.core.generation.tasks.DataSourceRetrievalResult;
+import com.seibel.distanthorizons.core.generation.tasks.ERetrievalResultState;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.render.renderer.AbstractDebugWireframeRenderer;
 import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
+import com.seibel.distanthorizons.core.util.ExceptionUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
 import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
@@ -51,6 +53,7 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 	 * to prevent duplicate concurrent updates.
 	 */
 	private final Set<Long> updatingPosSet = ConcurrentHashMap.newKeySet();
+	private final Set<Long> generatingPosSet = ConcurrentHashMap.newKeySet();
 	
 	/**
 	 * It'd be better if we could be told when changes are available,
@@ -119,10 +122,9 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 				
 				this.runParentUpdates(executor, targetBlockPos);
 				
-				if (Config.Common.LodBuilding.Experimental.upsampleLowerDetailLodsToFillHoles.get())
-				{
-					this.runChildUpdates(executor, targetBlockPos);
-				}
+				this.runChildUpdates(executor, targetBlockPos);
+				
+				this.queueRegeneration(executor, targetBlockPos);
 				
 			}
 			catch (InterruptedException ignored)
@@ -135,6 +137,7 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 			}
 		}
 	}
+	
 	/** will always apply updates */
 	private void runParentUpdates(PriorityTaskPicker.Executor executor, DhBlockPos targetBlockPos)
 	{
@@ -190,60 +193,62 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 					boolean parentLocked = false;
 					try
 					{
-						//LOGGER.info("updating parent: "+parentUpdatePos);
-						
 						// Locking the parent before the children should prevent deadlocks.
 						// TryLock is used instead of lock so this thread can handle a different update.
-						if (parentWriteLock.tryLock())
+						if (!parentWriteLock.tryLock())
 						{
-							parentLocked = true;
-							this.dataUpdater.lockedPosSet.add(parentUpdatePos);
-							
-							try (FullDataSourceV2 parentDataSource = this.provider.get(parentUpdatePos))
+							return;
+						}
+						
+						parentLocked = true;
+						this.dataUpdater.lockedPosSet.add(parentUpdatePos);
+						
+						try (FullDataSourceV2 parentDataSource = this.provider.get(parentUpdatePos))
+						{
+							// will return null if the file handler is shutting down
+							if (parentDataSource == null)
 							{
-								// will return null if the file handler is shutting down
-								if (parentDataSource != null)
+								return;
+							}
+							
+							// apply each child pos to the parent
+							for (Long childPos : updatePosByParentPos.get(parentUpdatePos))
+							{
+								ReentrantLock childReadLock = this.dataUpdater.updateLockProvider.getLock(childPos);
+								try
 								{
-									// apply each child pos to the parent
-									for (Long childPos : updatePosByParentPos.get(parentUpdatePos))
+									childReadLock.lock();
+									this.dataUpdater.lockedPosSet.add(childPos);
+									
+									try (FullDataSourceV2 childDataSource = this.provider.get(childPos))
 									{
-										ReentrantLock childReadLock = this.dataUpdater.updateLockProvider.getLock(childPos);
-										try
+										// can return null when the file handler is being shut down
+										if (childDataSource != null)
 										{
-											childReadLock.lock();
-											this.dataUpdater.lockedPosSet.add(childPos);
-											
-											try (FullDataSourceV2 childDataSource = this.provider.get(childPos))
-											{
-												// can return null when the file handler is being shut down
-												if (childDataSource != null)
-												{
-													parentDataSource.updateFromDataSource(childDataSource);
-												}
-											}
-										}
-										catch (Exception e)
-										{
-											LOGGER.error("Unexpected in parent update propagation for parent pos: ["+DhSectionPos.toString(parentUpdatePos)+"], child pos: [" + DhSectionPos.toString(parentUpdatePos) + "], Error: [" + e.getMessage() + "].", e);
-										}
-										finally
-										{
-											this.provider.repo.setApplyToParent(childPos, false);
-											
-											childReadLock.unlock();
-											this.dataUpdater.lockedPosSet.remove(childPos);
+											parentDataSource.updateFromDataSource(childDataSource);
 										}
 									}
+								}
+								catch (Exception e)
+								{
+									LOGGER.error("Unexpected in parent update propagation for parent pos: ["+DhSectionPos.toString(parentUpdatePos)+"], child pos: [" + DhSectionPos.toString(parentUpdatePos) + "], Error: [" + e.getMessage() + "].", e);
+								}
+								finally
+								{
+									this.provider.repo.setApplyToParent(childPos, false);
 									
-									
-									if (DhSectionPos.getDetailLevel(parentUpdatePos) < FullDataSourceProviderV2.ROOT_SECTION_DETAIL_LEVEL)
-									{
-										parentDataSource.applyToParent = true;
-									}
-									
-									this.dataUpdater.updateDataSource(parentDataSource);
+									childReadLock.unlock();
+									this.dataUpdater.lockedPosSet.remove(childPos);
 								}
 							}
+							
+							// don't modify other update propagator flags
+							{
+								parentDataSource.applyToChildren = null;
+								parentDataSource.regenerate = null;
+							}
+							
+							this.dataUpdater.updateDataSource(parentDataSource);
 						}
 					}
 					finally
@@ -267,6 +272,7 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 			}
 		}
 	}
+	
 	/** stops if it finds any LOD data */
 	private void runChildUpdates(PriorityTaskPicker.Executor executor, DhBlockPos targetBlockPos)
 	{
@@ -282,151 +288,242 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 			// queue the updates
 			for (long updatePos : updatePosList)
 			{
-				if (this.provider instanceof GeneratedFullDataSourceProvider
-					&& this.provider.canQueueRetrievalNow())
+				// stop if there are already a bunch of updates queued
+				if (this.updatingPosSet.size() > maxUpdateTaskCount
+					|| executor.getQueueSize() > maxUpdateTaskCount)
 				{
-					int maxQueueCount = GeneratedFullDataSourceProvider.MAX_WORLD_GEN_REQUESTS_PER_THREAD * Config.Common.MultiThreading.numberOfThreads.get();
-					maxQueueCount /= 2;
-					
-					GeneratedFullDataSourceProvider genProvider = ((GeneratedFullDataSourceProvider)this.provider);
-					IFullDataSourceRetrievalQueue queue = genProvider.worldGenQueueRef.get();
-					if (queue == null
-						|| queue.getQueuedChunkCount() > maxQueueCount)
+					break;
+				}
+				
+				// skip already updating positions
+				if (!this.updatingPosSet.add(updatePos))
+				{
+					continue;
+				}
+				
+				
+				try
+				{
+					executor.execute(() ->
 					{
-						return;
-					}
-					
-					
-					
-					if (this.updatingPosSet.add(updatePos))
-					{
-						// just generate highest detail
-						LongArrayList posToGen = genProvider.getPositionsToRetrieve(updatePos, (byte)DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL, EDhApiWorldGenerationStep.FEATURES);
-						CompletableFuture<DataSourceRetrievalResult>[] futureArray = new CompletableFuture[posToGen.size()];
-						for (int i = 0; i < posToGen.size(); i++)
+						ReentrantLock parentReadLock = this.dataUpdater.updateLockProvider.getLock(updatePos);
+						boolean parentLocked = false;
+						try
 						{
-							long genPos = posToGen.getLong(i);
-							futureArray[i] = genProvider.queuePositionForRetrieval(genPos);
-						}
-						
-						// generate N-sized all the way down first
-						//CompletableFuture<DataSourceRetrievalResult>[] futureArray = new CompletableFuture[4];
-						//for (int i = 0; i < 4; i++)
-						//{
-						//	long childPos = DhSectionPos.getChildByIndex(updatePos, i);
-						//	futureArray[i] = genProvider.queuePositionForRetrieval(childPos);
-						//}
-						
-						CompletableFuture.allOf(futureArray)
-							.thenRun(() -> 
+							// Locking the parent before the children should prevent deadlocks.
+							// TryLock is used instead of lock so this thread can handle a different update.
+							if (!parentReadLock.tryLock())
 							{
-								this.updatingPosSet.remove(updatePos);
-								this.provider.repo.setApplyToChild(updatePos, false);
-							});
-						
+								return;
+							}
+							
+							
+							parentLocked = true;
+							this.dataUpdater.lockedPosSet.add(updatePos);
+							
+							try (FullDataSourceV2 parentDataSource = this.provider.get(updatePos))
+							{
+								// will return null if the file handler is shutting down
+								if (parentDataSource == null)
+								{
+									return;
+								}
+								
+								
+								
+								// apply parent to each child
+								for (int i = 0; i < 4; i++)
+								{
+									long childPos = DhSectionPos.getChildByIndex(updatePos, i);
+									
+									ReentrantLock childWriteLock = this.dataUpdater.updateLockProvider.getLock(childPos);
+									try
+									{
+										childWriteLock.lock();
+										this.dataUpdater.lockedPosSet.add(childPos);
+										
+										try (FullDataSourceV2 childDataSource = this.provider.get(childPos))
+										{
+											// will return null if the file handler is shutting down
+											if (childDataSource == null)
+											{
+												continue;
+											}
+											
+											childDataSource.updateFromDataSource(parentDataSource);
+											
+											// don't modify other update propagator flags
+											{
+												childDataSource.applyToParent = null;
+												childDataSource.regenerate = null;
+											}
+											
+											this.dataUpdater.updateDataSource(childDataSource);
+											
+											if (DhSectionPos.getDetailLevel(childPos) == DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL)
+											{
+												this.provider.repo.setRegenerate(childPos, true);
+											}
+											
+										}
+									}
+									catch (Exception e)
+									{
+										LOGGER.error("Unexpected in child update propagation for parent pos: ["+DhSectionPos.toString(updatePos)+"], child pos: [" + DhSectionPos.toString(updatePos) + "], Error: [" + e.getMessage() + "].", e);
+									}
+									finally
+									{
+										this.provider.repo.setApplyToChild(updatePos, false);
+										
+										childWriteLock.unlock();
+										this.dataUpdater.lockedPosSet.remove(childPos);
+									}
+								}
+							}
+						}
+						finally
+						{
+							if (parentLocked)
+							{
+								parentReadLock.unlock();
+								this.dataUpdater.lockedPosSet.remove(updatePos);
+							}
+							
+							this.updatingPosSet.remove(updatePos);
+						}
+					});
+				}
+				catch (RejectedExecutionException ignore)
+				{ /* the executor was shut down, it should be back up shortly and able to accept new jobs */ }
+				catch (Exception e)
+				{
+					this.updatingPosSet.remove(updatePos);
+					throw e;
+				}
+			}
+		}
+	}
+	
+	/** stops if it finds any LOD data */
+	private void queueRegeneration(PriorityTaskPicker.Executor executor, DhBlockPos targetBlockPos)
+	{
+		int maxUpdateTaskCount = getMaxPropagateTaskCount();
+		
+		// queue child updates
+		if (executor.getQueueSize() < maxUpdateTaskCount
+			&& this.updatingPosSet.size() < maxUpdateTaskCount
+			&& this.generatingPosSet.size() < maxUpdateTaskCount)
+		{
+			// get the positions that need to be regenerated
+			LongArrayList updatePosList = this.provider.repo.getChildPositionsToRegen(targetBlockPos.getX(), targetBlockPos.getZ(), maxUpdateTaskCount);
+			
+			// queue the updates
+			for (long updatePos : updatePosList)
+			{
+				this.tryQueueWorldGenTask(updatePos);
+			}
+		}
+	}
+	private void tryQueueWorldGenTask(long updatePos)
+	{
+		if (!(this.provider instanceof GeneratedFullDataSourceProvider))
+		{
+			return;
+		}
+		
+		if (!this.provider.canQueueRetrievalNow())
+		{
+			return;
+		}
+		
+		if (this.generatingPosSet.contains(updatePos))
+		{
+			return;
+		}
+		
+		
+		// TODO common method needed
+		int maxQueueCount = GeneratedFullDataSourceProvider.MAX_WORLD_GEN_REQUESTS_PER_THREAD * Config.Common.MultiThreading.numberOfThreads.get();
+		maxQueueCount /= 2;
+		
+		GeneratedFullDataSourceProvider genProvider = ((GeneratedFullDataSourceProvider)this.provider);
+		IFullDataSourceRetrievalQueue queue = genProvider.worldGenQueueRef.get();
+		if (queue == null
+			|| queue.getQueuedChunkCount() > maxQueueCount)
+		{
+			return;
+		}
+		
+		
+		
+		// just generate highest detail
+		LongArrayList posToGen = genProvider.getPositionsToRetrieve(updatePos, (byte)DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL, EDhApiWorldGenerationStep.FEATURES);
+		if (posToGen == null)
+		{
+			return;
+		}
+		
+		if (posToGen.size() == 0)
+		{
+			// position is already generated
+			this.provider.repo.setRegenerate(updatePos, false);
+			return;
+		}
+		
+		
+		
+		if (!this.generatingPosSet.add(updatePos))
+		{
+			return;
+		}
+		
+		CompletableFuture<DataSourceRetrievalResult>[] futureArray = new CompletableFuture[posToGen.size()];
+		for (int i = 0; i < posToGen.size(); i++)
+		{
+			long genPos = posToGen.getLong(i);
+			futureArray[i] = genProvider.queuePositionForRetrieval(genPos);
+		}
+		
+		CompletableFuture.allOf(futureArray)
+			.handle((voidObj, throwable) -> 
+			{
+				this.generatingPosSet.remove(updatePos);
+				
+				if (throwable != null 
+					&& ExceptionUtil.isShutdownException(throwable))
+				{
+					LOGGER.error("Unexpected error on Update gen future: ["+throwable.getMessage()+"].", throwable);
+				}
+				
+				
+				boolean finishedGenerating = true;
+				for (int i = 0; i < futureArray.length; i++)
+				{
+					try
+					{
+						DataSourceRetrievalResult result = futureArray[i].getNow(null);
+						if (result == null
+							|| result.dataSource == null)
+						{
+							finishedGenerating = false;
+							break;
+						}
+					}
+					catch (Exception e)
+					{
+						// completed exceptionally
+						finishedGenerating = false;
+						break;
 					}
 				}
 				
-				//// stop if there are already a bunch of updates queued
-				//if (this.updatingPosSet.size() > maxUpdateTaskCount
-				//	|| executor.getQueueSize() > maxUpdateTaskCount)
-				//{
-				//	break;
-				//}
-				//
-				//// skip already updating positions
-				//if (!this.updatingPosSet.add(updatePos))
-				//{
-				//	continue;
-				//}
-				//
-				//try
-				//{
-				//	executor.execute(() ->
-				//	{
-				//		ReentrantLock parentReadLock = this.dataUpdater.updateLockProvider.getLock(updatePos);
-				//		boolean parentLocked = false;
-				//		try
-				//		{
-				//			//LOGGER.info("updating parent: "+parentUpdatePos);
-				//			
-				//			// Locking the parent before the children should prevent deadlocks.
-				//			// TryLock is used instead of lock so this thread can handle a different update.
-				//			if (parentReadLock.tryLock())
-				//			{
-				//				parentLocked = true;
-				//				this.dataUpdater.lockedPosSet.add(updatePos);
-				//				
-				//				try (FullDataSourceV2 parentDataSource = this.provider.get(updatePos))
-				//				{
-				//					// will return null if the file handler is shutting down
-				//					if (parentDataSource != null)
-				//					{
-				//						// apply parent to each child
-				//						for (int i = 0; i < 4; i++)
-				//						{
-				//							long childPos = DhSectionPos.getChildByIndex(updatePos, i);
-				//							
-				//							ReentrantLock childWriteLock = this.dataUpdater.updateLockProvider.getLock(childPos);
-				//							try
-				//							{
-				//								childWriteLock.lock();
-				//								this.dataUpdater.lockedPosSet.add(childPos);
-				//								
-				//								try (FullDataSourceV2 childDataSource = this.provider.get(childPos))
-				//								{
-				//									// will return null if the file handler is shutting down
-				//									if (childDataSource != null)
-				//									{
-				//										childDataSource.updateFromDataSource(parentDataSource);
-				//										
-				//										// don't propagate child updates past the bottom of the tree
-				//										if (DhSectionPos.getDetailLevel(childPos) != DhSectionPos.SECTION_BLOCK_DETAIL_LEVEL)
-				//										{
-				//											childDataSource.applyToChildren = true;
-				//										}
-				//										
-				//										this.dataUpdater.updateDataSource(childDataSource);
-				//									}
-				//								}
-				//							}
-				//							catch (Exception e)
-				//							{
-				//								LOGGER.error("Unexpected in child update propagation for parent pos: ["+DhSectionPos.toString(updatePos)+"], child pos: [" + DhSectionPos.toString(updatePos) + "], Error: [" + e.getMessage() + "].", e);
-				//							}
-				//							finally
-				//							{
-				//								this.provider.repo.setApplyToChild(updatePos, false);
-				//								
-				//								childWriteLock.unlock();
-				//								this.dataUpdater.lockedPosSet.remove(childPos);
-				//							}
-				//						}
-				//					}
-				//				}
-				//			}
-				//		}
-				//		finally
-				//		{
-				//			if (parentLocked)
-				//			{
-				//				parentReadLock.unlock();
-				//				this.dataUpdater.lockedPosSet.remove(updatePos);
-				//			}
-				//			
-				//			this.updatingPosSet.remove(updatePos);
-				//		}
-				//	});
-				//}
-				//catch (RejectedExecutionException ignore)
-				//{ /* the executor was shut down, it should be back up shortly and able to accept new jobs */ }
-				//catch (Exception e)
-				//{
-				//	this.updatingPosSet.remove(updatePos);
-				//	throw e;
-				//}
-			}
-		}
+				if (finishedGenerating)
+				{
+					this.provider.repo.setRegenerate(updatePos, false);
+				}
+				
+				return null;
+			});
 	}
 	
 	//endregion
@@ -443,6 +540,9 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 	{
 		this.updatingPosSet
 				.forEach((pos) -> { renderer.renderBox(new AbstractDebugWireframeRenderer.Box(pos, -32f, 80f, 0.20f, Color.MAGENTA)); });
+		
+		this.generatingPosSet
+				.forEach((pos) -> { renderer.renderBox(new AbstractDebugWireframeRenderer.Box(pos, -32f, 80f, 0.20f, Color.CYAN)); });
 	}
 	
 	@Override

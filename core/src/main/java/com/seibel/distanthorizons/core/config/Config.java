@@ -1643,32 +1643,15 @@ public class Config
 					+ "")
 				.build();
 			
-			public static ConfigCategory experimental = new ConfigCategory.Builder().set(Experimental.class).build();
+			//public static ConfigCategory experimental = new ConfigCategory.Builder().set(Experimental.class).build();
 			
 			
 			
-			public static class Experimental
-			{
-				public static ConfigUIComment experimentalHeader = new ConfigUIComment.Builder().setParentConfigClass(Experimental.class).build();
-				
-				public static ConfigEntry<Boolean> upsampleLowerDetailLodsToFillHoles = new ConfigEntry.Builder<Boolean>()
-					.set(false)
-					.comment(""
-						+ "When active DH will attempt to fill missing LOD data \n"
-						+ "with any data that is present in the tree, preventing holes when moving \n"
-						+ "when a N-sized generator (or server) is active. \n"
-						+ "\n"
-						+ "This is only used when N-sized world generation is available \n"
-						+ "and/or when on a server where [generateOnlyInHighestDetail] is false. \n"
-						+ "\n"
-						+ "Experimental:\n"
-						+ "Enabling this option will increase CPU and harddrive use\n"
-						+ "and may cause rendering bugs.\n"
-						+ "\n"
-						+ "")
-					.build();
-				
-			}
+			//public static class Experimental
+			//{
+			//	public static ConfigUIComment experimentalHeader = new ConfigUIComment.Builder().setParentConfigClass(Experimental.class).build();
+			//	
+			//}
 			
 		}
 		

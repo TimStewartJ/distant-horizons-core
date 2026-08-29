@@ -121,6 +121,9 @@ public class FullDataSourceV2
 	/** Will be null if we don't want to update this value in the DB */
 	@Nullable
 	public Boolean applyToChildren = null;
+	/** Will be null if we don't want to update this value in the DB */
+	@Nullable
+	public Boolean regenerate = null; // TODO rename?
 	
 	/** should only be used by methods exposed via the DH API */
 	private boolean runApiSetterValidation = false;
@@ -388,7 +391,7 @@ public class FullDataSourceV2
 		int[] remappedIds = this.mapping.mergeAndReturnRemappedEntityIds(inputDataSource.mapping);
 		
 		boolean dataChanged;
-		if (inputDetailLevel == thisDetailLevel)
+		if (inputDetailLevel == thisDetailLevel) // same level update
 		{
 			dataChanged = this.updateFromSameDetailLevel(inputDataSource, remappedIds);
 			
@@ -410,10 +413,21 @@ public class FullDataSourceV2
 						// don't propagate past the bottom of the tree
 						&& (DhSectionPos.getDetailLevel(this.pos) > FullDataSourceProviderV2.LEAF_SECTION_DETAIL_LEVEL);
 			}
+			
+			// null check to prevent setting a flag we don't want to save in the DB
+			if (this.regenerate != null 
+				|| inputDataSource.regenerate != null)
+			{
+				this.regenerate =
+						(BoolUtil.falseIfNull(this.regenerate) || BoolUtil.falseIfNull(inputDataSource.regenerate));
+			}
 		}
-		else if (inputDetailLevel + 1 == thisDetailLevel)
+		else if (inputDetailLevel + 1 == thisDetailLevel) // applying to parent
 		{
 			dataChanged = this.updateFromOneBelowDetailLevel(inputDataSource, remappedIds);
+			
+			// TODO can we just remove the flags, set them always to null
+			//      and let callers handle this?
 			
 			// propagating up, parent will need changes
 			this.applyToParent =
@@ -421,17 +435,30 @@ public class FullDataSourceV2
 					&& (BoolUtil.falseIfNull(this.applyToParent) || BoolUtil.falseIfNull(inputDataSource.applyToParent))
 					&& (DhSectionPos.getDetailLevel(this.pos) < FullDataSourceProviderV2.ROOT_SECTION_DETAIL_LEVEL);
 			
+			// only leaf nodes will ever need regenerating
+			this.regenerate = false;
+			
 		}
-		else if (inputDetailLevel - 1 == thisDetailLevel)
+		else if (inputDetailLevel - 1 == thisDetailLevel) // downsampling to child
 		{
 			dataChanged = this.downsampleFromOneAboveDetailLevel(inputDataSource, remappedIds);
 			
-			// propagating down, children will need changes
+			// TODO can we just remove the flags, set them always to null
+			//      and let callers handle this?
 			
-			this.applyToChildren =
-					dataChanged
-					&& (BoolUtil.falseIfNull(this.applyToChildren) || BoolUtil.falseIfNull(inputDataSource.applyToChildren))
-					&& (DhSectionPos.getDetailLevel(this.pos) > FullDataSourceProviderV2.LEAF_SECTION_DETAIL_LEVEL);
+			// propagating down, children will need changes
+			if ((DhSectionPos.getDetailLevel(this.pos) > FullDataSourceProviderV2.LEAF_SECTION_DETAIL_LEVEL))
+			{
+				// downsample non-leaf nodes
+				this.applyToChildren = true;
+				this.regenerate = false;
+			}
+			else
+			{
+				// generate leaf nodes
+				this.applyToChildren = false;
+				this.regenerate = true;
+			}
 		}
 		else
 		{

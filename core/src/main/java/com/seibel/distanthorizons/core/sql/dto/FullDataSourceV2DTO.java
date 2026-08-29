@@ -93,6 +93,9 @@ public class FullDataSourceV2DTO
 	/** Will be null if we don't want to update this value in the DB */
 	@Nullable
 	public Boolean applyToChildren;
+	/** Will be null if we don't want to update this value in the DB */
+	@Nullable
+	public Boolean regenerate;
 	
 	public long lastModifiedUnixDateTime;
 	public long createdUnixDateTime;
@@ -130,6 +133,7 @@ public class FullDataSourceV2DTO
 			dto.createdUnixDateTime = dataSource.createdUnixDateTime;
 			dto.applyToParent = dataSource.applyToParent;
 			dto.applyToChildren = dataSource.applyToChildren;
+			dto.regenerate = dataSource.regenerate;
 		}
 		
 		return dto;
@@ -296,6 +300,10 @@ public class FullDataSourceV2DTO
 		if (this.applyToChildren != null)
 		{
 			dataSource.applyToChildren = this.applyToChildren;
+		}
+		if (this.regenerate != null)
+		{
+			dataSource.regenerate = this.regenerate;
 		}
 		
 		return dataSource;
@@ -804,6 +812,7 @@ public class FullDataSourceV2DTO
 		
 		this.applyToParent = in.readBoolean();
 		this.applyToChildren = in.readBoolean();
+		this.regenerate = in.readBoolean();
 		
 		this.lastModifiedUnixDateTime = in.readLong();
 		this.createdUnixDateTime = in.readLong();
@@ -834,6 +843,7 @@ public class FullDataSourceV2DTO
 				.add("compressionModeValue", this.compressionModeValue)
 				.add("applyToParent", this.applyToParent)
 				.add("applyToChildren", this.applyToChildren)
+				.add("regenerate", this.regenerate)
 				.add("lastModifiedUnixDateTime", this.lastModifiedUnixDateTime)
 				.add("createdUnixDateTime", this.createdUnixDateTime)
 				.toString();

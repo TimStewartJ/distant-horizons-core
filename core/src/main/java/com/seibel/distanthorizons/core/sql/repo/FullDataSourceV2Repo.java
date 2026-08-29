@@ -112,6 +112,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		// while these values can be null in the DB, null would just equate to false
 		boolean applyToParent = (resultSet.getInt("ApplyToParent")) == 1;
 		boolean applyToChildren = (resultSet.getInt("ApplyToChildren")) == 1;
+		boolean regenerate = (resultSet.getInt("Regenerate")) == 1;
 		
 		long lastModifiedUnixDateTime = resultSet.getLong("LastModifiedUnixDateTime");
 		long createdUnixDateTime = resultSet.getLong("CreatedUnixDateTime");
@@ -149,6 +150,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 			dto.createdUnixDateTime = createdUnixDateTime;
 			dto.applyToParent = applyToParent;
 			dto.applyToChildren = applyToChildren;
+			dto.regenerate = regenerate;
 		}
 		return dto;
 	}
@@ -169,6 +171,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		// while these values can be null in the DB, null would just equate to false
 		boolean applyToParent = (resultSet.getInt("ApplyToParent")) == 1;
 		boolean applyToChildren = (resultSet.getInt("ApplyToChildren")) == 1;
+		boolean regenerate = (resultSet.getInt("Regenerate")) == 1;
 		
 		long lastModifiedUnixDateTime = resultSet.getLong("LastModifiedUnixDateTime");
 		long createdUnixDateTime = resultSet.getLong("CreatedUnixDateTime");
@@ -196,6 +199,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 			dto.createdUnixDateTime = createdUnixDateTime;
 			dto.applyToParent = applyToParent;
 			dto.applyToChildren = applyToChildren;
+			dto.regenerate = regenerate;
 		}
 		return dto;
 	}
@@ -213,14 +217,14 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 			"   MinY, DataChecksum, \n" +
 			"   Data, ColumnGenerationStep, ColumnWorldCompressionMode, Mapping, \n" +
 			"   NorthAdjData, SouthAdjData, EastAdjData, WestAdjData, \n" +
-			"   DataFormatVersion, CompressionMode, ApplyToParent, ApplyToChildren, \n" +
+			"   DataFormatVersion, CompressionMode, ApplyToParent, ApplyToChildren, Regenerate, \n" +
 			"   LastModifiedUnixDateTime, CreatedUnixDateTime) \n" +
 			"VALUES( \n" +
 			"    ?, ?, ?, \n" +
 			"    ?, ?, \n" +
 			"    ?, ?, ?, ?, \n" +
 			"    ?, ?, ?, ?, \n" +
-			"    ?, ?, ?, ?, \n" +
+			"    ?, ?, ?, ?, ?, \n" +
 			"    ?, ? \n" +
 			") \n" +
 			"ON CONFLICT(DetailLevel, PosX, PosZ) DO UPDATE SET \n" +
@@ -238,6 +242,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 			// only update these values if they're present
 			(dto.applyToParent != null ? "   ,ApplyToParent = excluded.ApplyToParent \n" : "") +
 			(dto.applyToChildren != null ? "   ,ApplyToChildren = excluded.ApplyToChildren \n" : "") +
+			(dto.regenerate != null ? "   ,Regenerate = excluded.Regenerate \n" : "") +
 			
 			"   ,LastModifiedUnixDateTime = excluded.LastModifiedUnixDateTime \n"
 			// intern should help reduce memory overhead due to this string being dynamic
@@ -277,6 +282,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 		// if nothing is present assume we don't need/want to propagate updates
 		statement.setBoolean(i++, BoolUtil.falseIfNull(dto.applyToParent));
 		statement.setBoolean(i++, BoolUtil.falseIfNull(dto.applyToChildren));
+		statement.setBoolean(i++, BoolUtil.falseIfNull(dto.regenerate));
 		
 		statement.setLong(i++, System.currentTimeMillis()); // last modified unix time
 		statement.setLong(i++, System.currentTimeMillis()); // created unix time (only used if this is a fresh insert)
@@ -297,7 +303,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 			"SELECT \n" +
 					"   DataChecksum, \n" +
 					"   ColumnGenerationStep, ColumnWorldCompressionMode, Mapping, \n" +
-					"   DataFormatVersion, CompressionMode, ApplyToParent, ApplyToChildren, \n" +
+					"   DataFormatVersion, CompressionMode, ApplyToParent, ApplyToChildren, Regenerate, \n" +
 					"   LastModifiedUnixDateTime, CreatedUnixDateTime, \n" +
 					"   DIRECTION_ENUM as AdjData \n" +
 					"FROM "+this.getTableName() + "\n" +
@@ -389,19 +395,26 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 			"SET ApplyToParent = ? \n" +
 			"WHERE DetailLevel = ? AND PosX = ? AND PosZ = ?";
 	public void setApplyToParent(long pos, boolean applyToParent)
-	{ this.setApplyToFlag(pos, applyToParent, true); }
+	{ this.setApplyToFlag(pos, applyToParent, this.setApplyToParentSql); }
 	
 	/** should be be very similar to {@link FullDataSourceV2Repo#setApplyToParentSql} */
 	private final String setApplyToChildrenSql =
 			"UPDATE "+this.getTableName()+" \n" +
-					"SET ApplyToChildren = ? \n" +
-					"WHERE DetailLevel = ? AND PosX = ? AND PosZ = ?";
+			"SET ApplyToChildren = ? \n" +
+			"WHERE DetailLevel = ? AND PosX = ? AND PosZ = ?";
 	public void setApplyToChild(long pos, boolean applyToChild)
-	{ this.setApplyToFlag(pos, applyToChild, false); }
+	{ this.setApplyToFlag(pos, applyToChild, this.setApplyToChildrenSql); }
 	
-	private void setApplyToFlag(long pos, boolean applyFlag, boolean applyToParent)
+	/** should be be very similar to {@link FullDataSourceV2Repo#setApplyToParentSql} */
+	private final String setRegenerateToChildrenSql =
+			"UPDATE "+this.getTableName()+" \n" +
+			"SET Regenerate = ? \n" +
+			"WHERE DetailLevel = ? AND PosX = ? AND PosZ = ?";
+	public void setRegenerate(long pos, boolean applyToChild)
+	{ this.setApplyToFlag(pos, applyToChild, this.setRegenerateToChildrenSql); }
+	
+	private void setApplyToFlag(long pos, boolean applyFlag, String sql)
 	{
-		String sql = applyToParent ? this.setApplyToParentSql : this.setApplyToChildrenSql;
 		try (PreparedStatement statement = this.createPreparedStatement(sql))
 		{
 			if (statement == null)
@@ -443,7 +456,7 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 			"ORDER BY Distance ASC " + // DetailLevel ASC,
 			"LIMIT ?; ";
 	public LongArrayList getPositionsToUpdate(int targetBlockPosX, int targetBlockPosZ, int returnCount)
-	{ return this.getPositionsToUpdate(targetBlockPosX, targetBlockPosZ, returnCount, true); }
+	{ return this.getPositionsToUpdate(targetBlockPosX, targetBlockPosZ, returnCount, this.getParentPositionsToUpdateSql); }
 	
 	/** should be be very similar to {@link FullDataSourceV2Repo#getParentPositionsToUpdateSql} */
 	private final String getChildPositionsToUpdateSql =
@@ -454,13 +467,23 @@ public class FullDataSourceV2Repo extends AbstractDhRepo<Long, FullDataSourceV2D
 			"ORDER BY Distance ASC " + // DetailLevel ASC, 
 			"LIMIT ?; ";
 	public LongArrayList getChildPositionsToUpdate(int targetBlockPosX, int targetBlockPosZ, int returnCount)
-	{ return this.getPositionsToUpdate(targetBlockPosX, targetBlockPosZ, returnCount, false); }
+	{ return this.getPositionsToUpdate(targetBlockPosX, targetBlockPosZ, returnCount, this.getChildPositionsToUpdateSql); }
 	
-	private LongArrayList getPositionsToUpdate(int targetBlockPosX, int targetBlockPosZ, int returnCount, boolean getParentUpdates)
+	/** should be be very similar to {@link FullDataSourceV2Repo#getParentPositionsToUpdateSql} */
+	private final String getRegenPositionsToUpdateSql =
+		"SELECT DetailLevel, PosX, PosZ, " +
+			"   abs((PosX << (6 + DetailLevel)) - ?) + abs((PosZ << (6 + DetailLevel)) - ?) AS Distance " +
+			"FROM " + this.getTableName() + " " +
+			"WHERE Regenerate = 1 " +
+			"ORDER BY Distance ASC " + // DetailLevel ASC, 
+			"LIMIT ?; ";
+	public LongArrayList getChildPositionsToRegen(int targetBlockPosX, int targetBlockPosZ, int returnCount)
+	{ return this.getPositionsToUpdate(targetBlockPosX, targetBlockPosZ, returnCount, this.getRegenPositionsToUpdateSql); }
+	
+	private LongArrayList getPositionsToUpdate(int targetBlockPosX, int targetBlockPosZ, int returnCount, String sql)
 	{
 		LongArrayList list = new LongArrayList();
 		
-		String sql = getParentUpdates ? this.getParentPositionsToUpdateSql : this.getChildPositionsToUpdateSql;
 		try (PreparedStatement statement = this.createPreparedStatement(sql))
 		{
 			if (statement == null)
