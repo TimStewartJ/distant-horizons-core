@@ -1,36 +1,29 @@
 package com.seibel.distanthorizons.core.file.fullDatafile.V2;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiDataCompressionMode;
-import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.file.fullDatafile.IDataSourceUpdateListenerFunc;
 import com.seibel.distanthorizons.core.generation.DhLightingEngine;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.render.renderer.AbstractDebugWireframeRenderer;
 import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
 import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
-import com.seibel.distanthorizons.core.util.FullDataPointUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.threading.PositionalLockProvider;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class FullDataUpdaterV2 implements IDebugRenderable, AutoCloseable
 {
@@ -44,9 +37,7 @@ public class FullDataUpdaterV2 implements IDebugRenderable, AutoCloseable
 	public final Set<Long> lockedPosSet = ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<Long, AtomicInteger> queuedUpdateCountsByPos = new ConcurrentHashMap<>();
 	
-	private final ArrayList<IDataSourceUpdateListenerFunc<FullDataSourceV2>> dateSourceUpdateListeners = new ArrayList<>();
-	/** using a read write lock since most operations will be reads */
-	private final ReentrantReadWriteLock updateListenerReadWriteLock = new ReentrantReadWriteLock();
+	private final Set<IDataSourceUpdateListenerFunc<FullDataSourceV2>> dateSourceUpdateListenerSet = Collections.newSetFromMap(new ConcurrentHashMap<>());
 	
 	private final String levelId;
 	private final AtomicBoolean isShutdownRef = new AtomicBoolean(false);
@@ -172,21 +163,12 @@ public class FullDataUpdaterV2 implements IDebugRenderable, AutoCloseable
 						}
 						
 						
-						ReentrantReadWriteLock.ReadLock listenerReadLock = this.updateListenerReadWriteLock.readLock();
-						try
+						for (IDataSourceUpdateListenerFunc<FullDataSourceV2> listener : this.dateSourceUpdateListenerSet)
 						{
-							listenerReadLock.lock();
-							for (IDataSourceUpdateListenerFunc<FullDataSourceV2> listener : this.dateSourceUpdateListeners)
+							if (listener != null)
 							{
-								if (listener != null)
-								{
-									listener.OnDataSourceUpdated(recipientDataSource);
-								}
+								listener.OnDataSourceUpdated(recipientDataSource);
 							}
-						}
-						finally
-						{
-							listenerReadLock.unlock();
 						}
 					}
 				}
@@ -228,31 +210,9 @@ public class FullDataUpdaterV2 implements IDebugRenderable, AutoCloseable
 	//region
 	
 	public void addDataSourceUpdateListener(IDataSourceUpdateListenerFunc<FullDataSourceV2> listener)
-	{
-		ReentrantReadWriteLock.WriteLock writeLock = this.updateListenerReadWriteLock.writeLock();
-		try
-		{
-			writeLock.lock();
-			this.dateSourceUpdateListeners.add(listener);
-		}
-		finally
-		{
-			writeLock.unlock();
-		}
-	}
+	{ this.dateSourceUpdateListenerSet.add(listener); }
 	public void removeDataSourceUpdateListener(IDataSourceUpdateListenerFunc<FullDataSourceV2> listener)
-	{
-		ReentrantReadWriteLock.WriteLock writeLock = this.updateListenerReadWriteLock.writeLock();
-		try
-		{
-			writeLock.lock();
-			this.dateSourceUpdateListeners.remove(listener);
-		}
-		finally
-		{
-			writeLock.unlock();
-		}
-	}
+	{ this.dateSourceUpdateListenerSet.remove(listener); }
 	
 	//endregion
 	
