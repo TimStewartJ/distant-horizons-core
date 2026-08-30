@@ -644,6 +644,8 @@ public class DhApiTerrainDataRepo implements IDhApiTerrainDataRepo
 					if (rayCast.success 
 						&& rayCast.payload != null)
 					{
+						DhApiResult<DhApiTerrainDataPoint[]> raycastCol = getTerrainDataColumnArray(levelWrapper, DhSectionPos.encode((byte) 0, rayCast.payload.pos.x, rayCast.payload.pos.z), null, DEBUG_DATA_CACHE);
+						
 						if (debugRenderer != null)
 						{
 							debugRenderer.makeParticle(
