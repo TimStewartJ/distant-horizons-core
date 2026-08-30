@@ -142,7 +142,6 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 		}
 	}
 	
-	/** will always apply updates */
 	private void runParentUpdates(PriorityTaskPicker.Executor executor, DhBlockPos targetBlockPos)
 	{
 		int maxUpdateTaskCount = getMaxPropagateTaskCount();
@@ -277,7 +276,6 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 		}
 	}
 	
-	/** stops if it finds any LOD data */
 	private void runChildUpdates(PriorityTaskPicker.Executor executor, DhBlockPos targetBlockPos)
 	{
 		int maxUpdateTaskCount = getMaxPropagateTaskCount();
@@ -408,7 +406,6 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 		}
 	}
 	
-	/** stops if it finds any LOD data */
 	private void queueRegeneration(PriorityTaskPicker.Executor executor, DhBlockPos targetBlockPos)
 	{
 		boolean canQueueRegen = false;
