@@ -66,6 +66,7 @@ public interface IWrapperFactory extends IDhApiWrapperFactory, IBindable
 	IBlockStateWrapper deserializeBlockStateWrapper(String str, ILevelWrapper levelWrapper) throws IOException;
 	IBlockStateWrapper getAirBlockStateWrapper();
 	IBlockStateWrapper getWaterBlockStateWrapper(ILevelWrapper levelWrapper);
+	/** Returns AIR if the deserialization fails */
 	default IBlockStateWrapper deserializeBlockStateWrapperOrGetDefault(String str, ILevelWrapper levelWrapper)
 	{
 		IBlockStateWrapper blockState;
