@@ -32,4 +32,7 @@ public interface IDhApiBiomeWrapper extends IDhApiUnsafeWrapper
 {
 	String getName();
 	
+	/** @since API 7.1.0 */
+	String getSerialString();
+	
 }
