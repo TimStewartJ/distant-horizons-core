@@ -7,7 +7,9 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
 import com.seibel.distanthorizons.core.generation.queues.IFullDataSourceRetrievalQueue;
 import com.seibel.distanthorizons.core.generation.tasks.DataSourceRetrievalResult;
-import com.seibel.distanthorizons.core.generation.tasks.ERetrievalResultState;
+import com.seibel.distanthorizons.core.level.IDhClientLevel;
+import com.seibel.distanthorizons.core.level.IDhLevel;
+import com.seibel.distanthorizons.core.level.IDhServerLevel;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
@@ -19,6 +21,8 @@ import com.seibel.distanthorizons.core.util.ThreadUtil;
 import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import java.awt.*;
@@ -37,6 +41,7 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
 	private static final IMinecraftClientWrapper MC_CLIENT = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
+	private static final IMinecraftSharedWrapper MC_SHARED = SingletonInjector.INSTANCE.get(IMinecraftSharedWrapper.class);
 	
 	/** indicates how long the update queue thread should wait between queuing ticks */
 	protected static final int PROPAGATE_QUEUE_THREAD_DELAY_IN_MS = 250;
@@ -62,8 +67,7 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 	 */
 	public final ThreadPoolExecutor updateQueueProcessor;
 	
-	private final AtomicBoolean isShutdownRef = new AtomicBoolean(false);
-	private final String levelId;
+	private final IDhLevel dhLevel;
 	
 	
 	private final FullDataSourceProviderV2 provider;
@@ -76,14 +80,15 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 	//=============//
 	//region
 	
-	public FullDataUpdatePropagatorV2(FullDataSourceProviderV2 provider, FullDataUpdaterV2 dataUpdater, String levelId)
+	public FullDataUpdatePropagatorV2(FullDataSourceProviderV2 provider, FullDataUpdaterV2 dataUpdater, IDhLevel dhLevel)
 	{
 		this.provider = provider;
 		this.dataUpdater = dataUpdater;
-		this.levelId = levelId;
+		
+		this.dhLevel = dhLevel;
 		
 		// update propagation doesn't need to be run on the server since only the highest detail level is needed
-		this.updateQueueProcessor = ThreadUtil.makeSingleThreadPool("Update Propagate Queue [" + this.levelId + "]");
+		this.updateQueueProcessor = ThreadUtil.makeSingleThreadPool("Update Propagate Queue [" + dhLevel.getLevelWrapper().getDhIdentifier() + "]");
 		this.updateQueueProcessor.execute(this::runUpdateQueue);
 	}
 	
@@ -125,7 +130,6 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 				this.runChildUpdates(executor, targetBlockPos);
 				
 				this.queueRegeneration(executor, targetBlockPos);
-				
 			}
 			catch (InterruptedException ignored)
 			{
@@ -407,6 +411,25 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 	/** stops if it finds any LOD data */
 	private void queueRegeneration(PriorityTaskPicker.Executor executor, DhBlockPos targetBlockPos)
 	{
+		boolean canQueueRegen = false;
+		if (MC_SHARED.isDedicatedServer())
+		{
+			// dedicated servers can always generate chunks
+			canQueueRegen = true;
+		}
+		else if (this.dhLevel instanceof IDhClientLevel)
+		{
+			// singleplayer should only generate in levels that are actively being rendered
+			canQueueRegen = ((IDhClientLevel)this.dhLevel).isRendering();
+		}
+		
+		if (!canQueueRegen)
+		{
+			return;
+		}
+		
+		
+		
 		int maxUpdateTaskCount = getMaxPropagateTaskCount();
 		
 		// queue child updates
