@@ -513,7 +513,7 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 				this.generatingPosSet.remove(updatePos);
 				
 				if (throwable != null 
-					&& ExceptionUtil.isShutdownException(throwable))
+					&& !ExceptionUtil.isShutdownException(throwable))
 				{
 					LOGGER.error("Unexpected error on Update gen future: ["+throwable.getMessage()+"].", throwable);
 				}
