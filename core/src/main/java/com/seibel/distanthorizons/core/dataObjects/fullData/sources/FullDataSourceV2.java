@@ -907,8 +907,14 @@ public class FullDataSourceV2
 			
 			// Determine merged values for this slice
 			int id = determineMostCommonValueInColumnSlice(mergeIds, inputDataSource.mapping);
-			byte blockLight = (byte) determineAverageValueInColumnSlice(mergeBlockLights);
-			byte skyLight = (byte) determineAverageValueInColumnSlice(mergeSkyLights);
+			
+			// Only average light from sub-columns that match the winning ID.
+			// Otherwise light from an outvoted block (ie: surface water) can bleed
+			// into the merged datapoint (ie: sand under the water),
+			// causing incorrect bright spots.
+			byte blockLight = (byte) determineAverageValueInColumnSliceWithId(mergeBlockLights, mergeIds, id);
+			byte skyLight = (byte) determineAverageValueInColumnSliceWithId(mergeSkyLights, mergeIds, id);
+			
 			
 			// Check if we need to start a new datapoint
 			if (accumulatedHeight == 0)
@@ -1047,6 +1053,45 @@ public class FullDataSourceV2
 		{
 			return value3;
 		}
+	}
+	
+	/**
+	 * We need to average based on the winning ID vs 
+	 * all datapoints equally to prevent light bleeding
+	 * into underwater blocks.
+	 * If we average everything equally we may accidentally pick the water surface
+	 * as a light value, which would have a much brighter value than
+	 * the underwater blocks, causing a bright spot.
+	 */
+	private static int determineAverageValueInColumnSliceWithId(int[] sliceArray, int[] mergeIds, int winningId)
+	{
+		if (RUN_UPDATE_DEV_VALIDATION)
+		{
+			LodUtil.assertTrue(sliceArray.length == 4, "Column Slice should only contain 4 values.");
+			LodUtil.assertTrue(mergeIds.length == 4, "Column Slice should only contain 4 values.");
+		}
+		
+		
+		int sum = 0;
+		int count = 0;
+		for (int i = 0; i < 4; i++)
+		{
+			if (mergeIds[i] == winningId)
+			{
+				sum += sliceArray[i];
+				count++;
+			}
+		}
+		
+		if (count == 0)
+		{
+			// if all 4 blocks are different, averaging all four
+			// datapoints should be safe and provides us
+			// with smoother lighting
+			return determineAverageValueInColumnSlice(sliceArray);
+		}
+		
+		return sum / count;
 	}
 	private static int determineAverageValueInColumnSlice(int[] sliceArray)
 	{
