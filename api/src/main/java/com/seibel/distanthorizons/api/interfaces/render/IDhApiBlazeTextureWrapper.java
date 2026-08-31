@@ -29,7 +29,7 @@ import com.seibel.distanthorizons.api.interfaces.IDhApiUnsafeWrapper;
  * @version 2026-07-11
  * @since API 7.1.0
  */
-public interface IDhApiBlazeTextureWrapper
+public interface IDhApiBlazeTextureWrapper extends IDhApiUnsafeWrapper
 {
 	/** 
 	 * Roughly describes the purpose of this texture. <br/>
@@ -41,15 +41,6 @@ public interface IDhApiBlazeTextureWrapper
 	int getWidth();
 	/** @return -1 if the texture is null */
 	int getHeight();
-	
-	
-	/** will return null if the texture hasn't been initialized yet */
-	Object getTexture();
-	/** will return null if the texture hasn't been initialized yet */
-	Object getTextureView();
-	/** will return null if the texture hasn't been initialized yet */
-	Object getTextureSampler();
-	
 	
 	
 }
