@@ -223,35 +223,39 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 							
 							boolean parentUpdated = false;
 							
-							// apply each child pos to the parent
-							for (Long childOutputPos : outputChildPosByInputParentPos.get(parentInputPos))
+							// Apply all children before running the whole-parent cleanup,
+							// occlusion, and hash passes.
+							try (FullDataSourceV2.UpdateBatch updateBatch = parentInputDataSource.beginUpdateBatch())
 							{
-								ReentrantLock childReadLock = this.dataUpdater.updateLockProvider.getLock(childOutputPos);
-								try
+								for (Long childOutputPos : outputChildPosByInputParentPos.get(parentInputPos))
 								{
-									childReadLock.lock();
-									this.dataUpdater.lockedPosSet.add(childOutputPos);
-									
-									try (FullDataSourceV2 childOutputDataSource = this.provider.get(childOutputPos))
+									ReentrantLock childReadLock = this.dataUpdater.updateLockProvider.getLock(childOutputPos);
+									try
 									{
-										// can return null when the file handler is being shut down
-										if (childOutputDataSource != null)
+										childReadLock.lock();
+										this.dataUpdater.lockedPosSet.add(childOutputPos);
+									
+										try (FullDataSourceV2 childOutputDataSource = this.provider.get(childOutputPos))
 										{
-											parentUpdated = parentInputDataSource.updateFromDataSource(childOutputDataSource) 
-												| parentUpdated;
+											// can return null when the file handler is being shut down
+											if (childOutputDataSource != null)
+											{
+												parentUpdated = updateBatch.updateFromDataSource(childOutputDataSource) 
+													| parentUpdated;
+											}
 										}
 									}
-								}
-								catch (Exception e)
-								{
-									LOGGER.error("Unexpected in parent update propagation for parent pos: ["+DhSectionPos.toString(parentInputPos)+"], child pos: [" + DhSectionPos.toString(parentInputPos) + "], Error: [" + e.getMessage() + "].", e);
-								}
-								finally
-								{
-									this.provider.repo.setApplyToParent(childOutputPos, false);
+									catch (Exception e)
+									{
+										LOGGER.error("Unexpected in parent update propagation for parent pos: ["+DhSectionPos.toString(parentInputPos)+"], child pos: [" + DhSectionPos.toString(parentInputPos) + "], Error: [" + e.getMessage() + "].", e);
+									}
+									finally
+									{
+										this.provider.repo.setApplyToParent(childOutputPos, false);
 									
-									childReadLock.unlock();
-									this.dataUpdater.lockedPosSet.remove(childOutputPos);
+										childReadLock.unlock();
+										this.dataUpdater.lockedPosSet.remove(childOutputPos);
+									}
 								}
 							}
 							

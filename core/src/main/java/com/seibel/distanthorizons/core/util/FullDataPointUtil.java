@@ -47,9 +47,9 @@ public class FullDataPointUtil
 	/** Represents the data held by an empty data point */
 	public static final int EMPTY_DATA_POINT = 0;
 	
-	public static final int ID_WIDTH = 32;
-	public static final int HEIGHT_WIDTH = 12;
-	public static final int MIN_Y_WIDTH = 12;
+	public static final int ID_WIDTH = 28;
+	public static final int HEIGHT_WIDTH = 14;
+	public static final int MIN_Y_WIDTH = 14;
 	public static final int SKY_LIGHT_WIDTH = 4;
 	public static final int BLOCK_LIGHT_WIDTH = 4;
 	
@@ -61,7 +61,7 @@ public class FullDataPointUtil
 	public static final int BLOCK_LIGHT_OFFSET = SKY_LIGHT_OFFSET + SKY_LIGHT_WIDTH;
 	
 	
-	public static final long ID_MASK = Integer.MAX_VALUE;
+	public static final long ID_MASK = (1L << ID_WIDTH) - 1L;
 	public static final long INVERSE_ID_MASK = ~ID_MASK;
 	public static final int HEIGHT_MASK = (int) Math.pow(2, HEIGHT_WIDTH) - 1;
 	public static final int MIN_Y_MASK = (int) Math.pow(2, MIN_Y_WIDTH) - 1;
@@ -122,6 +122,10 @@ public class FullDataPointUtil
 		{
 			throw new DataCorruptedException("Full datapoint ID [" + relMinY + "] must be greater than zero.");
 		}
+		if (id > ID_MASK)
+		{
+			throw new DataCorruptedException("Full datapoint ID [" + id + "] must be in the range [0 - "+ID_MASK+"] (inclusive).");
+		}
 		
 		// height
 		if (relMinY < 0 || relMinY >= RenderDataPointUtil.MAX_WORLD_Y_SIZE)
@@ -178,9 +182,9 @@ public class FullDataPointUtil
 	//=========//
 	//region
 	
-	public static long setId(long data, int id) { return (data & ~(((ID_MASK)) << ID_OFFSET)) | (((long)(id)) << ID_OFFSET); }
-	public static long setHeight(long data, int height) { return (data & ~(((long)(HEIGHT_MASK)) << HEIGHT_OFFSET)) | (((long)(height)) << HEIGHT_OFFSET); }
-	public static long setBottomY(long data, int bottomY) { return (data & ~(((long)(MIN_Y_MASK)) << MIN_Y_OFFSET)) | (((long)(bottomY)) << MIN_Y_OFFSET); }
+	public static long setId(long data, int id) { return (data & ~(((ID_MASK)) << ID_OFFSET)) | (((long)(id) & ID_MASK) << ID_OFFSET); }
+	public static long setHeight(long data, int height) { return (data & ~(((long)(HEIGHT_MASK)) << HEIGHT_OFFSET)) | (((long)(height) & HEIGHT_MASK) << HEIGHT_OFFSET); }
+	public static long setBottomY(long data, int bottomY) { return (data & ~(((long)(MIN_Y_MASK)) << MIN_Y_OFFSET)) | (((long)(bottomY) & MIN_Y_MASK) << MIN_Y_OFFSET); }
 	public static long setBlockLight(long data, byte blockLight) { return (data & ~((long) BLOCK_LIGHT_MASK << BLOCK_LIGHT_OFFSET) | (long) blockLight << BLOCK_LIGHT_OFFSET); }
 	public static long setSkyLight(long data, int skyLight) { return (data & ~((long) SKY_LIGHT_MASK << SKY_LIGHT_OFFSET) | (long) skyLight << SKY_LIGHT_OFFSET); }
 	
