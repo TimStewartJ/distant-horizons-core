@@ -1460,10 +1460,6 @@ public class FullDataSourceV2
 	public int getWidthInDataColumns() { return WIDTH; }
 	
 	@Override
-	public List<DhApiTerrainDataPoint> setApiDataPointColumn(int relX, int relZ, List<DhApiTerrainDataPoint> columnDataPoints) 
-				throws IndexOutOfBoundsException, IllegalArgumentException
-	{ return this.setApiDataPointColumn(relX, relZ, EDhApiWorldGenerationStep.SURFACE, columnDataPoints); }
-	@Override
 	public List<DhApiTerrainDataPoint> setApiDataPointColumn(int relX, int relZ, EDhApiWorldGenerationStep worldGenStep, List<DhApiTerrainDataPoint> columnDataPoints) 
 				throws IndexOutOfBoundsException, IllegalArgumentException
 	{
