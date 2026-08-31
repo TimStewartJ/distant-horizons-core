@@ -172,11 +172,22 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		{
 			if (removeIf.accept(genPos))
 			{
-				DataSourceRetrievalTask removedTask = this.waitingTasks.remove(genPos);
-				if (removedTask != null)
+				DataSourceRetrievalTask removedTask = this.waitingTasks.get(genPos);
+				if (removedTask != null && this.waitingTasks.remove(genPos, removedTask))
 				{
 					// cancel tasks so any waiting future steps can be triggered
-					removedTask.future.cancel(true);
+					removedTask.cancel(true);
+				}
+			}
+		});
+		this.inProgressGenTasksByLodPos.forEachKey(100, (genPos) ->
+		{
+			if (removeIf.accept(genPos))
+			{
+				DataSourceRetrievalTask removedTask = this.inProgressGenTasksByLodPos.get(genPos);
+				if (removedTask != null && this.inProgressGenTasksByLodPos.remove(genPos, removedTask))
+				{
+					removedTask.cancel(true);
 				}
 			}
 		});
@@ -269,10 +280,15 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		TaskDistancePair closestTaskPair = this.waitingTasks.reduceEntries(1024,
 			// get the target distance for each task
 			(Map.Entry<Long, DataSourceRetrievalTask> entry) ->
-			{ 
+			{
 				DataSourceRetrievalTask task = entry.getValue();
+				byte availability = this.getGenerationAvailability(task);
+				if (availability == IDhApiWorldGenerator.GENERATION_WAIT)
+				{
+					return null;
+				}
 				int distance = DhSectionPos.getCenterBlockPos(task.pos).chebyshevDist(targetPos);
-				return new TaskDistancePair(entry.getValue(), distance);
+				return new TaskDistancePair(entry.getValue(), distance, availability);
 			},
 			// find the closest task
 			(TaskDistancePair aTaskPair, TaskDistancePair bTaskPair) ->
@@ -291,7 +307,11 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		this.waitingTasks.remove(closestTask.pos, closestTask);
 		
 		// do we need to modify this task to generate it?
-		if (this.canGenerateDetailLevel(DhSectionPos.getDetailLevel(closestTask.pos)))
+		if (closestTaskPair.availability == IDhApiWorldGenerator.GENERATION_SPLIT)
+		{
+			closestTask.future.complete(DataSourceRetrievalResult.CreateSplit());
+		}
+		else if (this.canGenerateDetailLevel(DhSectionPos.getDetailLevel(closestTask.pos)))
 		{
 			// detail level is correct for generation, start generation
 			
@@ -332,6 +352,15 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		// queue another task
 		return true;
 	}
+	private byte getGenerationAvailability(DataSourceRetrievalTask task)
+	{
+		DhChunkPos chunkPosMin = new DhChunkPos(new DhBlockPos2D(DhSectionPos.getMinCornerBlockX(task.pos), DhSectionPos.getMinCornerBlockZ(task.pos)));
+		byte availability = this.generator.getGenerationAvailability(
+			chunkPosMin.getX(), chunkPosMin.getZ(), task.widthInChunks, task.requestDetailLevel);
+		return availability == IDhApiWorldGenerator.GENERATION_SPLIT || availability == IDhApiWorldGenerator.GENERATION_WAIT
+			? availability
+			: IDhApiWorldGenerator.GENERATION_READY;
+	}
 	private boolean canGenerateDetailLevel(byte taskDetailLevel)
 	{
 		byte requestedDetailLevel = (byte) (taskDetailLevel - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL);
@@ -347,6 +376,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		
 		long generationStartMsTime = System.currentTimeMillis();
 		CompletableFuture<FullDataSourceV2> generationFuture = this.startGenerationEvent(worldGenTask);
+		worldGenTask.attachGenerationFuture(generationFuture);
 		
 		// calculate generation speed
 		generationFuture.thenRun(() -> 
@@ -361,6 +391,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		{
 			try
 			{
+				this.inProgressGenTasksByLodPos.remove(taskPos, worldGenTask);
 				if (exception != null)
 				{
 					// don't log the shutdown exceptions
@@ -374,10 +405,11 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 				}
 				else
 				{
-					boolean taskRemoved = this.inProgressGenTasksByLodPos.remove(taskPos, worldGenTask);
-					LodUtil.assertTrue(taskRemoved, "Unable to find in progress generator task with position ["+DhSectionPos.toString(taskPos)+"]");
-					
-					worldGenTask.future.complete(DataSourceRetrievalResult.CreateSuccess(taskPos, fullDataSource));
+					boolean accepted = worldGenTask.future.complete(DataSourceRetrievalResult.CreateSuccess(taskPos, fullDataSource));
+					if (!accepted && fullDataSource != null)
+					{
+						fullDataSource.close();
+					}
 				}
 			}
 			catch (Exception e)
@@ -454,6 +486,13 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 				}
 			}
 		);
+		returnFuture.whenComplete((ignored, error) ->
+		{
+			if (returnFuture.isCancelled())
+			{
+				chunkGenFuture.cancel(true);
+			}
+		});
 		
 		chunkGenFuture.exceptionally((throwable) ->
 		{
@@ -508,6 +547,13 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 			ThreadPoolUtil.getWorldGenExecutor(),
 			(DhApiChunk apiChunk) -> { generatedChunks.add(apiChunk); }
 		);
+		returnFuture.whenComplete((ignored, error) ->
+		{
+			if (returnFuture.isCancelled())
+			{
+				chunkGenFuture.cancel(true);
+			}
+		});
 		
 		
 		chunkGenFuture.exceptionally((throwable) ->
@@ -564,6 +610,13 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 			ThreadPoolUtil.getWorldGenExecutor(),
 			(IDhApiFullDataSource apiDataSource) -> { }
 		);
+		returnFuture.whenComplete((ignored, error) ->
+		{
+			if (returnFuture.isCancelled())
+			{
+				lodGenFuture.cancel(true);
+			}
+		});
 		
 		
 		lodGenFuture.exceptionally((throwable) ->
@@ -679,7 +732,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 			
 			if (cancelCurrentGeneration)
 			{
-				genFuture.cancel(alsoInterruptRunning);
+				genTask.cancel(alsoInterruptRunning);
 			}
 			
 			inProgressTasksCancelingFutures.add(genFuture.handle((DataSourceRetrievalResult result, Throwable throwable) ->
@@ -766,11 +819,13 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	{
 		public final DataSourceRetrievalTask task;
 		public final int dist;
+		public final byte availability;
 		
-		public TaskDistancePair(DataSourceRetrievalTask task, int dist)
+		public TaskDistancePair(DataSourceRetrievalTask task, int dist, byte availability)
 		{
 			this.task = task;
 			this.dist = dist;
+			this.availability = availability;
 		}
 		
 	}
