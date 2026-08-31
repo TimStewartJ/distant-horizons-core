@@ -81,3 +81,13 @@ test {
     // need more than the default 512 MB of RAM
     jvmArgs '-Xmx4096m'
 }
+
+tasks.register("simulateTellusLodIngestion", JavaExec) {
+    group = "verification"
+    description = "Profiles DH ingestion, propagation, and serialization of Tellus-like tall API LOD data."
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = "tests.TellusLodIngestionSimulation"
+    maxHeapSize = "4g"
+    args "--warmup=${providers.gradleProperty('simWarmup').getOrElse('4')}"
+    args "--iterations=${providers.gradleProperty('simIterations').getOrElse('20')}"
+}
