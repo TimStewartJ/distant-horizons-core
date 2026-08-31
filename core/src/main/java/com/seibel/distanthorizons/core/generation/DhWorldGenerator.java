@@ -156,11 +156,13 @@ public class DhWorldGenerator implements IDhApiWorldGenerator
 	}
 	private @NotNull CompletableFuture<Void> generateChunksAsync(
 		int chunkPosMinX, int chunkPosMinZ, 
-		IDhApiFullDataSource pooledFullDataSource, 
+		IDhApiFullDataSource pooledApiDataSource, 
 		EDhApiDistantGeneratorMode generatorMode, 
 		ExecutorService worldGeneratorThreadPool, 
 		Consumer<IDhApiFullDataSource> resultConsumer)
 	{
+		FullDataSourceV2 pooledFullDataSource = (FullDataSourceV2) pooledApiDataSource; 
+		
 		EDhApiWorldGenerationStep targetStep;
 		switch (generatorMode)
 		{
@@ -201,7 +203,7 @@ public class DhWorldGenerator implements IDhApiWorldGenerator
 		
 		// separate future necessary to make sure the chunks 
 		// are processed before this event is
-		// marked as completed
+		// marked as completed, recycling the data source
 		return genFuture.handle((voidObj, throwable) ->
 			{
 				for (int i = 0; i < chunkList.size(); i++)
@@ -211,10 +213,11 @@ public class DhWorldGenerator implements IDhApiWorldGenerator
 					{
 						if (dataSource != null)
 						{
-							((FullDataSourceV2) pooledFullDataSource).updateFromDataSource(dataSource);
+							pooledFullDataSource.updateFromDataSource(dataSource);
 						}
 					}
 				}
+				pooledFullDataSource.recordLastSeen();
 				resultConsumer.accept(pooledFullDataSource);
 				
 				return null; // result ignored

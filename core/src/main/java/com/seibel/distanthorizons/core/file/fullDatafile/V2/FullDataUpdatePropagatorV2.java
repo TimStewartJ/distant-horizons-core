@@ -501,7 +501,7 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 		for (int i = 0; i < posToGen.size(); i++)
 		{
 			long genPos = posToGen.getLong(i);
-			futureArray[i] = genProvider.queuePositionForRetrieval(genPos);
+			futureArray[i] = genProvider.queuePositionForRetrieval(genPos); // this can cause the same positions to be queued multiple times, we handle that sanely down stream although it's a bit strange that it happens at all
 		}
 		
 		CompletableFuture.allOf(futureArray)

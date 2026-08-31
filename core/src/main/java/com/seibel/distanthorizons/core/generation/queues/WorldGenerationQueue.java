@@ -160,7 +160,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		// the request should be at least chunk-sized
 		LodUtil.assertTrue(DhSectionPos.getDetailLevel(pos) > requiredDataDetail + LodUtil.CHUNK_DETAIL_LEVEL);
 		
-		final DataSourceRetrievalTask newTask = new DataSourceRetrievalTask(pos, requiredDataDetail);
+		final byte finalRequiredDataDetail = requiredDataDetail;
 		DataSourceRetrievalTask queuedTask = this.waitingTaskByPos.compute(pos, (Long newPos, DataSourceRetrievalTask existingTask) -> 
 		{
 			if (existingTask != null)
@@ -168,7 +168,7 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 				return existingTask;
 			}
 			
-			return newTask;
+			return new DataSourceRetrievalTask(pos, finalRequiredDataDetail);
 		});
 		
 		return queuedTask.future;
@@ -319,6 +319,11 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 				
 				existingTask.future.thenApply((DataSourceRetrievalResult result)->
 				{
+					if (result.dataSource != null)
+					{
+						result.dataSource.recordLastSeen();
+					}
+					
 					closestTask.future.complete(result);
 					return closestTask.future; // return value ignored
 				});
@@ -384,6 +389,8 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 				}
 				else
 				{
+					fullDataSource.recordLastSeen();
+					
 					boolean taskRemoved = this.inProgressGenTasksByLodPos.remove(taskPos, worldGenTask);
 					LodUtil.assertTrue(taskRemoved, "Unable to find in progress generator task with position ["+DhSectionPos.toString(taskPos)+"]");
 					
@@ -578,11 +585,13 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		lodGenFuture.exceptionally((throwable) ->
 		{
 			returnFuture.completeExceptionally(throwable);
+			pooledDataSource.recordLastSeen();
 			pooledDataSource.close();
 			return null;
 		});
 		lodGenFuture.thenRun(() ->
 		{
+			pooledDataSource.recordLastSeen();
 			returnFuture.complete(pooledDataSource);
 		});
 		

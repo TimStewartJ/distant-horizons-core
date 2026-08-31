@@ -26,7 +26,6 @@ import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSour
 import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
 import com.seibel.distanthorizons.core.util.delayedSaveCache.DelayedDataSourceSaveCache;
 import com.seibel.distanthorizons.core.file.structure.ISaveStructure;
-import com.seibel.distanthorizons.core.generation.DhLightingEngine;
 import com.seibel.distanthorizons.core.generation.queues.IFullDataSourceRetrievalQueue;
 import com.seibel.distanthorizons.core.generation.tasks.DataSourceRetrievalResult;
 import com.seibel.distanthorizons.core.generation.tasks.ERetrievalResultState;
@@ -117,6 +116,12 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 	{
 		try
 		{
+			if (genTaskResult != null
+				&& genTaskResult.dataSource != null)
+			{
+				genTaskResult.dataSource.recordLastSeen();
+			}
+			
 			if (exception != null)
 			{
 				// don't log shutdown exceptions
@@ -285,16 +290,17 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 			return null;
 		}
 		
-		CompletableFuture<DataSourceRetrievalResult> worldGenFuture = worldGenQueue.submitRetrievalTask(genPos, (byte) (DhSectionPos.getDetailLevel(genPos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL));
-		
-		// only queue the when-complete once for each world gen task,
-		// otherwise we can end up trying to close the same datasource multiple times 
-		CompletableFuture<DataSourceRetrievalResult> oldWorldGenFuture = this.queuedRetrievalFutureByPos.putIfAbsent(genPos, worldGenFuture);
-		if (oldWorldGenFuture == null)
+		CompletableFuture<DataSourceRetrievalResult> worldGenFuture = this.queuedRetrievalFutureByPos.compute(genPos, (newGenPos, existingFuture) -> 
 		{
-			worldGenFuture.whenComplete((r, e) -> this.onWorldGenTaskComplete(genPos, r, e));
-		}
-		
+			if (existingFuture != null)
+			{
+				return existingFuture;
+			}
+			
+			CompletableFuture<DataSourceRetrievalResult> newFuture = worldGenQueue.submitRetrievalTask(newGenPos, (byte) (DhSectionPos.getDetailLevel(newGenPos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL));
+			newFuture.whenComplete((result, throwable) -> this.onWorldGenTaskComplete(genPos, result, throwable));
+			return newFuture;
+		});
 		return worldGenFuture;
 	}
 	
