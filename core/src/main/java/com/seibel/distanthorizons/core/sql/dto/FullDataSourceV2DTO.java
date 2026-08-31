@@ -61,7 +61,9 @@ public class FullDataSourceV2DTO
 	public static class DATA_FORMAT
 	{
 		public static final int V1_NO_ADJACENT_DATA = 1;
-		public static final int V2_LATEST = 2;
+		public static final int V2_VARINT_12_BIT_Y = 2;
+		public static final int V3_TELLUS_TALL_Y = 3;
+		public static final int V2_LATEST = V3_TELLUS_TALL_Y;
 	}
 	
 	
@@ -196,10 +198,12 @@ public class FullDataSourceV2DTO
 	{
 		// format validation //
 		
-		if (this.dataFormatVersion != DATA_FORMAT.V1_NO_ADJACENT_DATA 
-			&& this.dataFormatVersion != DATA_FORMAT.V2_LATEST)
+		if (this.dataFormatVersion != DATA_FORMAT.V1_NO_ADJACENT_DATA
+			&& this.dataFormatVersion != DATA_FORMAT.V2_VARINT_12_BIT_Y
+			&& this.dataFormatVersion != DATA_FORMAT.V3_TELLUS_TALL_Y)
 		{
-			throw new IllegalStateException("Data source population only supports formats: ["+DATA_FORMAT.V1_NO_ADJACENT_DATA +","+DATA_FORMAT.V2_LATEST +"], data format found: ["+this.dataFormatVersion+"].");
+			throw new IllegalStateException(
+					"Data source population only supports formats: ["+DATA_FORMAT.V1_NO_ADJACENT_DATA+","+DATA_FORMAT.V2_VARINT_12_BIT_Y+","+DATA_FORMAT.V3_TELLUS_TALL_Y+"], data format found: ["+this.dataFormatVersion+"].");
 		}
 		
 		if (direction != null
@@ -306,6 +310,21 @@ public class FullDataSourceV2DTO
 	//=================//
 	// (de)serializing //
 	//=================//
+
+	/** Raw packed-long layout used by data format V1. */
+	private static class V1_DATA_POINT_FORMAT
+	{
+		private static final int ID_OFFSET = 0;
+		private static final int HEIGHT_OFFSET = 32;
+		private static final int MIN_Y_OFFSET = 44;
+		private static final int SKY_LIGHT_OFFSET = 56;
+		private static final int BLOCK_LIGHT_OFFSET = 60;
+
+		private static final long ID_MASK = Integer.MAX_VALUE;
+		private static final long HEIGHT_MASK = 0xFFFL;
+		private static final long MIN_Y_MASK = 0xFFFL;
+		private static final long LIGHT_MASK = 0xFL;
+	}
 	
 	public static void writeDataSourceDataArrayToBlobV1(
 			LongArrayList[] inputDataArray, ByteArrayList outputByteArray, 
@@ -325,13 +344,13 @@ public class FullDataSourceV2DTO
 				// short fits that with less wasted spaces vs an int (short has max value of 32,767 vs int's max of 2 billion)
 				compressedOut.writeShort(columnLength);
 				
-				// write column data (will be skipped if no data was present)
-				for (int y = 0; y < columnLength; y++)
-				{
-					compressedOut.writeLong(dataColumn.getLong(y));
+					// write column data (will be skipped if no data was present)
+					for (int y = 0; y < columnLength; y++)
+					{
+						compressedOut.writeLong(convertCurrentDataPointToV1(dataColumn.getLong(y)));
+					}
 				}
 			}
-		}
 	}
 	private static void readBlobToDataSourceDataArrayV1(
 			ByteArrayList inputCompressedDataByteArray, LongArrayList[] outputDataLongArray, 
@@ -354,18 +373,50 @@ public class FullDataSourceV2DTO
 				LongArrayList dataColumn = outputDataLongArray[xz];
 				ListUtil.clearAndSetSize(dataColumn, dataColumnLength);
 				
-				// read column data (will be skipped if no data was present)
-				for (int y = 0; y < dataColumnLength; y++)
-				{
-					long dataPoint = compressedIn.readLong();
-					if (VALIDATE_INPUT_DATAPOINTS)
+					// read column data (will be skipped if no data was present)
+					for (int y = 0; y < dataColumnLength; y++)
 					{
-						FullDataPointUtil.validateDatapoint(dataPoint);
+						long dataPoint = convertV1DataPointToCurrent(compressedIn.readLong());
+						if (VALIDATE_INPUT_DATAPOINTS)
+						{
+							FullDataPointUtil.validateDatapoint(dataPoint);
 					}
 					dataColumn.set(y, dataPoint);
 				}
 			}
 		}
+	}
+
+	private static long convertCurrentDataPointToV1(long dataPoint) throws IOException
+	{
+		int id = FullDataPointUtil.getId(dataPoint);
+		int height = FullDataPointUtil.getHeight(dataPoint);
+		int bottomY = FullDataPointUtil.getBottomY(dataPoint);
+		int blockLight = FullDataPointUtil.getBlockLight(dataPoint);
+		int skyLight = FullDataPointUtil.getSkyLight(dataPoint);
+
+		if (id > V1_DATA_POINT_FORMAT.ID_MASK
+			|| height > V1_DATA_POINT_FORMAT.HEIGHT_MASK
+			|| bottomY > V1_DATA_POINT_FORMAT.MIN_Y_MASK)
+		{
+			throw new IOException("Data point cannot be represented by the V1 packed format: "+FullDataPointUtil.toString(dataPoint));
+		}
+
+		return ((long) id << V1_DATA_POINT_FORMAT.ID_OFFSET)
+			| ((long) height << V1_DATA_POINT_FORMAT.HEIGHT_OFFSET)
+			| ((long) bottomY << V1_DATA_POINT_FORMAT.MIN_Y_OFFSET)
+			| ((long) skyLight << V1_DATA_POINT_FORMAT.SKY_LIGHT_OFFSET)
+			| ((long) blockLight << V1_DATA_POINT_FORMAT.BLOCK_LIGHT_OFFSET);
+	}
+
+	private static long convertV1DataPointToCurrent(long dataPoint) throws DataCorruptedException
+	{
+		int id = (int) ((dataPoint >>> V1_DATA_POINT_FORMAT.ID_OFFSET) & V1_DATA_POINT_FORMAT.ID_MASK);
+		int height = (int) ((dataPoint >>> V1_DATA_POINT_FORMAT.HEIGHT_OFFSET) & V1_DATA_POINT_FORMAT.HEIGHT_MASK);
+		int bottomY = (int) ((dataPoint >>> V1_DATA_POINT_FORMAT.MIN_Y_OFFSET) & V1_DATA_POINT_FORMAT.MIN_Y_MASK);
+		byte skyLight = (byte) ((dataPoint >>> V1_DATA_POINT_FORMAT.SKY_LIGHT_OFFSET) & V1_DATA_POINT_FORMAT.LIGHT_MASK);
+		byte blockLight = (byte) ((dataPoint >>> V1_DATA_POINT_FORMAT.BLOCK_LIGHT_OFFSET) & V1_DATA_POINT_FORMAT.LIGHT_MASK);
+		return FullDataPointUtil.encode(id, height, bottomY, blockLight, skyLight);
 	}
 	
 	private static void writeDataSourceDataArrayToBlobV2(

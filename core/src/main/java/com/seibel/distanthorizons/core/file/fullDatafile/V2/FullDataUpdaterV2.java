@@ -135,26 +135,7 @@ public class FullDataUpdaterV2 implements IDebugRenderable, AutoCloseable
 					boolean dataModified = recipientDataSource.updateFromDataSource(inputData);
 					if (dataModified)
 					{
-						// save the updated data to the database
-						try (FullDataSourceV2DTO dto = this.createDtoFromDataSource(recipientDataSource))
-						{
-							if (dto != null)
-							{
-								this.provider.repo.save(dto);
-							}
-						}
-						
-						
-						synchronized (this.dateSourceUpdateListeners)
-						{
-							for (IDataSourceUpdateListenerFunc<FullDataSourceV2> listener : this.dateSourceUpdateListeners)
-							{
-								if (listener != null)
-								{
-									listener.OnDataSourceUpdated(recipientDataSource);
-								}
-							}
-						}
+						this.persistAndNotifyDataSource(recipientDataSource);
 					}
 				}
 			}
@@ -169,7 +150,48 @@ public class FullDataUpdaterV2 implements IDebugRenderable, AutoCloseable
 			this.lockedPosSet.remove(updatePos);
 		}
 	}
-	
+
+	/**
+	 * Persists a data source which was loaded and updated while its positional
+	 * update lock was already held. This avoids loading and merging the same row
+	 * a second time during parent/child propagation.
+	 */
+	void saveUpdatedDataSource(@NotNull FullDataSourceV2 dataSource)
+	{
+		long pos = dataSource.getPos();
+		ReentrantLock updateLock = this.updateLockProvider.getLock(pos);
+		if (!updateLock.isHeldByCurrentThread())
+		{
+			throw new IllegalStateException("Updated data source must be saved while holding its positional lock: ["+DhSectionPos.toString(pos)+"].");
+		}
+
+		this.persistAndNotifyDataSource(dataSource);
+	}
+
+	private void persistAndNotifyDataSource(@NotNull FullDataSourceV2 dataSource)
+	{
+		// save the updated data to the database
+		try (FullDataSourceV2DTO dto = this.createDtoFromDataSource(dataSource))
+		{
+			if (dto != null)
+			{
+				this.provider.repo.save(dto);
+			}
+		}
+
+
+		synchronized (this.dateSourceUpdateListeners)
+		{
+			for (IDataSourceUpdateListenerFunc<FullDataSourceV2> listener : this.dateSourceUpdateListeners)
+			{
+				if (listener != null)
+				{
+					listener.OnDataSourceUpdated(dataSource);
+				}
+			}
+		}
+	}
+
 	private FullDataSourceV2DTO createDtoFromDataSource(FullDataSourceV2 dataSource)
 	{
 		try

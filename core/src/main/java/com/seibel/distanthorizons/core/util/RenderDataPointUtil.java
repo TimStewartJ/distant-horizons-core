@@ -72,34 +72,39 @@ public class RenderDataPointUtil
 	
 	public final static int EMPTY_DATA = 0;
 
-	// the maximum valid Y value is the maximum min y + world height.
-	// min y is [-2032, 2031], height is < 4064.
-	public final static int MAX_WORLD_Y_SIZE = 2031 + 4064;
+	public final static int Y_WIDTH = 14;
+	public final static int RED_WIDTH = 7;
+	public final static int GREEN_WIDTH = 7;
+	public final static int BLUE_WIDTH = 6;
+
+	// The Tellus fork uses 14-bit render Y coordinates so true-height worlds
+	// up to 16383 blocks tall can be represented without changing render-data size.
+	public final static int MAX_WORLD_Y_SIZE = 1 << Y_WIDTH;
 	
 	public final static int ALPHA_DOWNSIZE_SHIFT = 4;
 	
 	
 	public final static int IRIS_BLOCK_MATERIAL_ID_SHIFT = 60;
 	
-	public final static int COLOR_SHIFT = 32;
-	public final static int BLUE_SHIFT = COLOR_SHIFT;
-	public final static int GREEN_SHIFT = BLUE_SHIFT + 8;
-	public final static int RED_SHIFT = GREEN_SHIFT + 8;
-	public final static int ALPHA_SHIFT = RED_SHIFT + 8;
+	public final static int BLUE_SHIFT = 36;
+	public final static int GREEN_SHIFT = BLUE_SHIFT + BLUE_WIDTH;
+	public final static int RED_SHIFT = GREEN_SHIFT + GREEN_WIDTH;
+	public final static int ALPHA_SHIFT = RED_SHIFT + RED_WIDTH;
+	public final static int COLOR_SHIFT = BLUE_SHIFT;
 	
-	public final static int HEIGHT_SHIFT = 20;
+	public final static int HEIGHT_SHIFT = 22;
 	public final static int DEPTH_SHIFT = 8;
 	public final static int BLOCK_LIGHT_SHIFT = 4;
 	public final static int SKY_LIGHT_SHIFT = 0;
 	
 	public final static long ALPHA_MASK = 0xF;
-	public final static long RED_MASK = 0xFF;
-	public final static long GREEN_MASK = 0xFF;
-	public final static long BLUE_MASK = 0xFF;
-	public final static long COLOR_MASK = 0xFFFFFF;
-	public final static long HEIGHT_MASK = 0xFFF;
-	public final static long DEPTH_MASK = 0xFFF;
-	public final static long HEIGHT_DEPTH_MASK = 0xFFFFFF;
+	public final static long RED_MASK = (1L << RED_WIDTH) - 1L;
+	public final static long GREEN_MASK = (1L << GREEN_WIDTH) - 1L;
+	public final static long BLUE_MASK = (1L << BLUE_WIDTH) - 1L;
+	public final static long COLOR_MASK = (1L << (RED_WIDTH + GREEN_WIDTH + BLUE_WIDTH)) - 1L;
+	public final static long HEIGHT_MASK = (1L << Y_WIDTH) - 1L;
+	public final static long DEPTH_MASK = (1L << Y_WIDTH) - 1L;
+	public final static long HEIGHT_DEPTH_MASK = (1L << (Y_WIDTH * 2)) - 1L;
 	public final static long BLOCK_LIGHT_MASK = 0xF;
 	public final static long SKY_LIGHT_MASK = 0xF;
 	public final static long IRIS_BLOCK_MATERIAL_ID_MASK = 0xF;
@@ -149,7 +154,7 @@ public class RenderDataPointUtil
 				LodUtil.assertNotReach("Trying to create datapoint with lightBlock[" + lightBlock + "] out of range!");
 			}
 			
-			if (irisBlockMaterialId < 0 || irisBlockMaterialId >= 256)
+			if (irisBlockMaterialId < 0 || irisBlockMaterialId > IRIS_BLOCK_MATERIAL_ID_MASK)
 			{
 				LodUtil.assertNotReach("Trying to create datapoint with irisBlockMaterialId[" + irisBlockMaterialId + "] out of range!");
 			}
@@ -180,9 +185,9 @@ public class RenderDataPointUtil
 		
 		
 		long out = (long) (alpha >>> ALPHA_DOWNSIZE_SHIFT) << ALPHA_SHIFT
-				| (red & RED_MASK) << RED_SHIFT
-				| (green & GREEN_MASK) << GREEN_SHIFT
-				| (blue & BLUE_MASK) << BLUE_SHIFT
+				| (long) packRed(red) << RED_SHIFT
+				| (long) packGreen(green) << GREEN_SHIFT
+				| (long) packBlue(blue) << BLUE_SHIFT
 				| (height & HEIGHT_MASK) << HEIGHT_SHIFT
 				| (depth & DEPTH_MASK) << DEPTH_SHIFT
 				| (lightBlock & BLOCK_LIGHT_MASK) << BLOCK_LIGHT_SHIFT
@@ -206,11 +211,16 @@ public class RenderDataPointUtil
 	/** AKA the starting/bottom/lowest Y value above {@link ILevelWrapper#getMinHeight()} */
 	public static short getYMin(long dataPoint) { return (short) ((dataPoint >>> DEPTH_SHIFT) & DEPTH_MASK); }
 	public static long setYMin(long dataPoint, int depth) { return (long) ((dataPoint & ~(DEPTH_MASK << DEPTH_SHIFT)) | (depth & DEPTH_MASK) << DEPTH_SHIFT); }
+	public static long setYMax(long dataPoint, int height) { return (long) ((dataPoint & ~(HEIGHT_MASK << HEIGHT_SHIFT)) | (height & HEIGHT_MASK) << HEIGHT_SHIFT); }
 	
 	public static short getAlpha(long dataPoint) { return (short) ((((dataPoint >>> ALPHA_SHIFT) & ALPHA_MASK) << ALPHA_DOWNSIZE_SHIFT) | 0b1111); }
-	public static short getRed(long dataPoint) { return (short) ((dataPoint >>> RED_SHIFT) & RED_MASK); }
-	public static short getGreen(long dataPoint) { return (short) ((dataPoint >>> GREEN_SHIFT) & GREEN_MASK); }
-	public static short getBlue(long dataPoint) { return (short) ((dataPoint >>> BLUE_SHIFT) & BLUE_MASK); }
+	public static short getRed(long dataPoint) { return (short) unpackColor((dataPoint >>> RED_SHIFT) & RED_MASK, RED_WIDTH); }
+	public static short getGreen(long dataPoint) { return (short) unpackColor((dataPoint >>> GREEN_SHIFT) & GREEN_MASK, GREEN_WIDTH); }
+	public static short getBlue(long dataPoint) { return (short) unpackColor((dataPoint >>> BLUE_SHIFT) & BLUE_MASK, BLUE_WIDTH); }
+	public static long setRed(long dataPoint, int red) { return (dataPoint & ~(RED_MASK << RED_SHIFT)) | ((long) packRed(red) << RED_SHIFT); }
+	public static long setGreen(long dataPoint, int green) { return (dataPoint & ~(GREEN_MASK << GREEN_SHIFT)) | ((long) packGreen(green) << GREEN_SHIFT); }
+	public static long setBlue(long dataPoint, int blue) { return (dataPoint & ~(BLUE_MASK << BLUE_SHIFT)) | ((long) packBlue(blue) << BLUE_SHIFT); }
+	public static long setAlpha(long dataPoint, int alpha) { return (dataPoint & ~(ALPHA_MASK << ALPHA_SHIFT)) | (((long) (alpha >>> ALPHA_DOWNSIZE_SHIFT) & ALPHA_MASK) << ALPHA_SHIFT); }
 	
 	public static byte getLightSky(long dataPoint) { return (byte) ((dataPoint >>> SKY_LIGHT_SHIFT) & SKY_LIGHT_MASK); }
 	public static byte getLightBlock(long dataPoint) { return (byte) ((dataPoint >>> BLOCK_LIGHT_SHIFT) & BLOCK_LIGHT_MASK); }
@@ -224,8 +234,19 @@ public class RenderDataPointUtil
 	
 	public static int getColor(long dataPoint)
 	{
-		long alpha = getAlpha(dataPoint);
-		return (int) (((dataPoint >>> COLOR_SHIFT) & COLOR_MASK) | (alpha << (ALPHA_SHIFT - COLOR_SHIFT)));
+		return getAlpha(dataPoint) << 24 | getRed(dataPoint) << 16 | getGreen(dataPoint) << 8 | getBlue(dataPoint);
+	}
+
+	public static int packRed(int red) { return packColor(red, RED_WIDTH); }
+	public static int packGreen(int green) { return packColor(green, GREEN_WIDTH); }
+	public static int packBlue(int blue) { return packColor(blue, BLUE_WIDTH); }
+
+	private static int packColor(int color, int width) { return (color & 0xFF) >>> (8 - width); }
+	private static int unpackColor(long color, int width)
+	{
+		int value = (int) color;
+		int shift = 8 - width;
+		return (value << shift) | (value >>> (width - shift));
 	}
 	
 	/** Return (>0) if dataA should replace dataB, (0) if equal, (<0) if dataB should replace dataA */

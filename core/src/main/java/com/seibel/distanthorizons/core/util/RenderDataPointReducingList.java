@@ -890,7 +890,7 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 			}
 		}
 		
-		return (highestDataPoint & ~RenderDataPointUtil.DEPTH_SHIFTED_MASK) | (RenderDataPointUtil.getYMin(lowestDataPoint) << RenderDataPointUtil.DEPTH_SHIFT);
+		return RenderDataPointUtil.setYMin(highestDataPoint, RenderDataPointUtil.getYMin(lowestDataPoint));
 	}
 	
 	
@@ -1003,29 +1003,28 @@ public class RenderDataPointReducingList extends AbstractPhantomArrayList
 
 	public void setMinY(int index, int minY) 
 	{
-		this.data.set(index, (this.data.getLong(index) & ~RenderDataPointUtil.DEPTH_SHIFTED_MASK) | ((minY & RenderDataPointUtil.DEPTH_MASK) << RenderDataPointUtil.DEPTH_SHIFT));
+		this.data.set(index, RenderDataPointUtil.setYMin(this.data.getLong(index), minY));
 	}
 	public void setMaxY(int index, int maxY) 
 	{
-		this.data.set(index, (this.data.getLong(index) & ~RenderDataPointUtil.HEIGHT_SHIFTED_MASK) | ((maxY & RenderDataPointUtil.HEIGHT_MASK) << RenderDataPointUtil.HEIGHT_SHIFT));
+		this.data.set(index, RenderDataPointUtil.setYMax(this.data.getLong(index), maxY));
 	}
 
 	public void setRed(int index, int red) 
 	{
-		this.data.set(index, (this.data.getLong(index) & ~(RenderDataPointUtil.RED_MASK << RenderDataPointUtil.RED_SHIFT)) | ((red & RenderDataPointUtil.RED_MASK) << RenderDataPointUtil.RED_SHIFT));
+		this.data.set(index, RenderDataPointUtil.setRed(this.data.getLong(index), red));
 	}
 	public void setGreen(int index, int green) 
 	{
-		this.data.set(index, (this.data.getLong(index) & ~(RenderDataPointUtil.GREEN_MASK << RenderDataPointUtil.GREEN_SHIFT)) | ((green & RenderDataPointUtil.GREEN_MASK) << RenderDataPointUtil.GREEN_SHIFT));
+		this.data.set(index, RenderDataPointUtil.setGreen(this.data.getLong(index), green));
 	}
 
 	public void setBlue(int index, int blue) {
-		this.data.set(index, (this.data.getLong(index) & ~(RenderDataPointUtil.BLUE_MASK << RenderDataPointUtil.BLUE_SHIFT)) | ((blue & RenderDataPointUtil.BLUE_MASK) << RenderDataPointUtil.BLUE_SHIFT));
+		this.data.set(index, RenderDataPointUtil.setBlue(this.data.getLong(index), blue));
 	}
 	public void setAlpha(int index, int alpha) 
 	{
-		alpha >>>= RenderDataPointUtil.ALPHA_DOWNSIZE_SHIFT;
-		this.data.set(index, (this.data.getLong(index) & ~(RenderDataPointUtil.ALPHA_MASK << RenderDataPointUtil.ALPHA_SHIFT)) | ((alpha & RenderDataPointUtil.ALPHA_MASK) << RenderDataPointUtil.ALPHA_SHIFT));
+		this.data.set(index, RenderDataPointUtil.setAlpha(this.data.getLong(index), alpha));
 	}
 	
 	public void setBlockLight(int index, int blockLight) 
