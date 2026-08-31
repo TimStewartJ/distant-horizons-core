@@ -27,14 +27,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
-public interface IBatchGeneratorEnvironmentWrapper extends AutoCloseable
+public interface IChunkGenerator extends AutoCloseable
 {
 	void updateAllFutures();
 	
 	CompletableFuture<Void> queueGenEvent(
-			int minX, int minZ, int genSize, 
-			EDhApiDistantGeneratorMode generatorMode, EDhApiWorldGenerationStep targetStep,
-			ExecutorService worldGeneratorThreadPool, Consumer<IChunkWrapper> resultConsumer);
+		int chunkPosMinX, int chunkPosMinZ, int chunkWidthCount,
+		EDhApiDistantGeneratorMode generatorMode, EDhApiWorldGenerationStep targetStep,
+		ExecutorService worldGeneratorThreadPool, Consumer<IChunkWrapper> resultConsumer);
 	
 	void close();
 	

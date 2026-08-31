@@ -29,7 +29,8 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.render.renderPass.IDhGe
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.objects.IVertexBufferWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.IChunkGenerator;
+import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.IRoughGenerator;
 import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 
@@ -43,7 +44,8 @@ import java.io.IOException;
  */
 public interface IWrapperFactory extends IDhApiWrapperFactory, IBindable
 {
-	IBatchGeneratorEnvironmentWrapper createBatchGenerator(IDhLevel targetLevel);
+	IChunkGenerator createChunkGenerator(IDhLevel targetLevel);
+	IRoughGenerator createRoughGenerator(IDhLevel targetLevel, IChunkGenerator batchChunkGenerator);
 	
 	IBiomeWrapper deserializeBiomeWrapper(String str, ILevelWrapper levelWrapper) throws IOException;
 	IBiomeWrapper getPlainsBiomeWrapper(ILevelWrapper levelWrapper); 
