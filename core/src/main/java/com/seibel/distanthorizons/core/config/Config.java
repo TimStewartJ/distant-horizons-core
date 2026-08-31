@@ -975,9 +975,10 @@ public class Config
 				public static ConfigUIComment autoUpdaterHeader = new ConfigUIComment.Builder().setParentConfigClass(AutoUpdater.class).build();
 				
 				public static ConfigEntry<Boolean> enableAutoUpdater = new ConfigEntry.Builder<Boolean>()
-					.set(!isRunningInDevEnvironment())
+					.set(false)
 					.comment(""
 						+ "Automatically check for updates on game launch? \n"
+						+ "Disabled by default for the Tellus fork so it cannot be replaced with an incompatible upstream build. \n"
 						+ "")
 					.build();
 				

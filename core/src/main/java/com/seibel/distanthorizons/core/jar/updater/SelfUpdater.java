@@ -75,6 +75,17 @@ public class SelfUpdater
 	 */
 	public static boolean onStart()
 	{
+		// The Tellus distribution carries coordinate-packing and full-data changes
+		// that are not compatible with upstream Distant Horizons jars. An existing
+		// user config may still have the updater enabled from an upstream install,
+		// so migrate that value before any network check or update prompt can run.
+		if (Config.Client.Advanced.AutoUpdater.enableAutoUpdater.get())
+		{
+			LOGGER.info("Disabling the Distant Horizons auto updater for the Tellus fork.");
+			Config.Client.Advanced.AutoUpdater.enableAutoUpdater.set(false);
+			return false;
+		}
+
 		if (!Config.Client.Advanced.AutoUpdater.enableAutoUpdater.get())
 		{
 			LOGGER.info("Distant Horizons auto update disabled.");
