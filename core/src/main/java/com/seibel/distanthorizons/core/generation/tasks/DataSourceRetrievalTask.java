@@ -39,6 +39,7 @@ public final class DataSourceRetrievalTask
 	public final int widthInChunks;
 	
 	public final CompletableFuture<DataSourceRetrievalResult> future = new CompletableFuture<>();
+	private volatile CompletableFuture<?> generationFuture;
 	
 	
 	
@@ -55,6 +56,23 @@ public final class DataSourceRetrievalTask
 		this.widthInChunks = widthInBlocks / LodUtil.CHUNK_WIDTH; 
 	}
 	
-	
+	public void attachGenerationFuture(CompletableFuture<?> generationFuture)
+	{
+		this.generationFuture = generationFuture;
+		if (this.future.isCancelled())
+		{
+			generationFuture.cancel(true);
+		}
+	}
+
+	public void cancel(boolean mayInterruptIfRunning)
+	{
+		this.future.cancel(mayInterruptIfRunning);
+		CompletableFuture<?> currentGenerationFuture = this.generationFuture;
+		if (currentGenerationFuture != null)
+		{
+			currentGenerationFuture.cancel(mayInterruptIfRunning);
+		}
+	}
 	
 }

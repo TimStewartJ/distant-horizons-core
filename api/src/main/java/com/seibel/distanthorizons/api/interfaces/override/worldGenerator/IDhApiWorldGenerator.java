@@ -38,6 +38,13 @@ import java.util.function.Consumer;
  */
 public interface IDhApiWorldGenerator extends Closeable, IDhApiOverrideable
 {
+	/** The requested region is cached and may be generated. */
+	byte GENERATION_READY = 0;
+	/** The requested region has mixed cache availability and should be split. */
+	byte GENERATION_SPLIT = 1;
+	/** The requested region is not cached yet and must remain queued. */
+	byte GENERATION_WAIT = 2;
+
 	//============//
 	// parameters //
 	//============//
@@ -81,6 +88,20 @@ public interface IDhApiWorldGenerator extends Closeable, IDhApiOverrideable
 	//=================//
 	// world generator //
 	//=================//
+
+	/**
+	 * Gives a generator ownership of readiness without starting generation. The default preserves
+	 * upstream behavior. Implementations may return {@link #GENERATION_WAIT} while an external
+	 * cache manager downloads data, or {@link #GENERATION_SPLIT} to expose ready sub-regions.
+	 */
+	default byte getGenerationAvailability(
+		int chunkPosMinX,
+		int chunkPosMinZ,
+		int generationRequestChunkWidthCount,
+		byte targetDataDetail)
+	{
+		return GENERATION_READY;
+	}
 	
 	/**
 	 * This method is called by Distant Horizons to generate terrain over a given area when
