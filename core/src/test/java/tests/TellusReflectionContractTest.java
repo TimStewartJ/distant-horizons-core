@@ -41,6 +41,8 @@ import java.lang.reflect.Type;
 public class TellusReflectionContractTest
 {
 	private static final String CONFIG = "com.seibel.distanthorizons.core.config.Config";
+	private static final String WORLD_GENERATION_QUEUE =
+		"com.seibel.distanthorizons.core.generation.queues.WorldGenerationQueue";
 	
 	
 	
@@ -82,6 +84,22 @@ public class TellusReflectionContractTest
 				method.isDefault());
 	}
 	
+	@Test
+	public void rejectedGenerationBackoffCapabilityReadByTellus() throws Exception
+	{
+		Class<?> queueClass = Class.forName(
+			WORLD_GENERATION_QUEUE,
+			false,
+			TellusReflectionContractTest.class.getClassLoader());
+		Field field = queueClass.getField("SUPPORTS_REJECTED_GENERATION_BACKOFF");
+
+		Assert.assertEquals(boolean.class, field.getType());
+		Assert.assertTrue(Modifier.isPublic(field.getModifiers()));
+		Assert.assertTrue(Modifier.isStatic(field.getModifiers()));
+		Assert.assertTrue(Modifier.isFinal(field.getModifiers()));
+		Assert.assertTrue(field.getBoolean(null));
+	}
+
 	
 	
 	private void assertConfigEntry(String ownerClassName, String fieldName, Class<?> valueType) throws Exception

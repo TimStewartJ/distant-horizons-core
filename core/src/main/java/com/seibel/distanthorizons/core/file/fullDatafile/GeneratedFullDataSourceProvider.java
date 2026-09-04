@@ -52,6 +52,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.LongPredicate;
 import java.util.stream.IntStream;
 
 public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 implements IDebugRenderable
@@ -113,7 +114,11 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 	// events //
 	//========//
 	
-	private void onWorldGenTaskComplete(@NotNull Long genPos, @Nullable DataSourceRetrievalResult genTaskResult, @Nullable Throwable exception)
+	private void onWorldGenTaskComplete(
+		@NotNull Long genPos,
+		@NotNull CompletableFuture<DataSourceRetrievalResult> completedFuture,
+		@Nullable DataSourceRetrievalResult genTaskResult,
+		@Nullable Throwable exception)
 	{
 		try
 		{
@@ -163,7 +168,7 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 		}
 		finally
 		{
-			this.queuedRetrievalFutureByPos.remove(genPos);
+			this.queuedRetrievalFutureByPos.remove(genPos, completedFuture);
 		}
 	}
 	
@@ -286,7 +291,11 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 		}
 
 		long priorityPos = worldGenQueue.getPriorityRetrievalPos(genPos);
-		if (priorityPos != genPos && !this.queuedRetrievalFutureByPos.containsKey(priorityPos))
+		if (shouldQueuePriorityRetrieval(
+			genPos,
+			priorityPos,
+			this.queuedRetrievalFutureByPos::containsKey,
+			this::hasUsableGeneratedCoverage))
 		{
 			this.queueSinglePositionForRetrieval(worldGenQueue, priorityPos);
 		}
@@ -298,19 +307,36 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 		IFullDataSourceRetrievalQueue worldGenQueue,
 		long genPos)
 	{
-		CompletableFuture<DataSourceRetrievalResult> worldGenFuture = worldGenQueue.submitRetrievalTask(genPos, (byte) (DhSectionPos.getDetailLevel(genPos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL));
-
-		// only queue the when-complete once for each world gen task,
-		// otherwise we can end up trying to close the same datasource multiple times 
-		CompletableFuture<DataSourceRetrievalResult> oldWorldGenFuture = this.queuedRetrievalFutureByPos.putIfAbsent(genPos, worldGenFuture);
-		if (oldWorldGenFuture == null)
+		synchronized (this.queuedRetrievalFutureByPos)
 		{
-			worldGenFuture.whenComplete((r, e) -> this.onWorldGenTaskComplete(genPos, r, e));
+			CompletableFuture<DataSourceRetrievalResult> existingFuture =
+				this.queuedRetrievalFutureByPos.get(genPos);
+			if (existingFuture != null)
+			{
+				return existingFuture;
+			}
+
+			CompletableFuture<DataSourceRetrievalResult> worldGenFuture = worldGenQueue.submitRetrievalTask(
+				genPos,
+				(byte) (DhSectionPos.getDetailLevel(genPos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL));
+			this.queuedRetrievalFutureByPos.put(genPos, worldGenFuture);
+			worldGenFuture.whenComplete((result, exception) ->
+				this.onWorldGenTaskComplete(genPos, worldGenFuture, result, exception));
+			return worldGenFuture;
 		}
-		
-		return worldGenFuture;
 	}
 	
+	static boolean shouldQueuePriorityRetrieval(
+		long requestedPos,
+		long priorityPos,
+		LongPredicate isQueued,
+		LongPredicate hasUsableGeneratedCoverage)
+	{
+		return priorityPos != requestedPos
+			&& !isQueued.test(priorityPos)
+			&& !hasUsableGeneratedCoverage.test(priorityPos);
+	}
+
 	@Override
 	public void removeRetrievalRequestIf(DhSectionPos.ICancelablePrimitiveLongConsumer removeIf)
 	{
@@ -327,13 +353,34 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 	
 	public boolean generationStepsAreFullyGenerated(ByteArrayList columnGenerationSteps)
 	{
-		return IntStream.range(0, columnGenerationSteps.size())
+		return generationStepsHaveUsableCoverage(columnGenerationSteps);
+	}
+	static boolean generationStepsHaveUsableCoverage(ByteArrayList columnGenerationSteps)
+	{
+		return columnGenerationSteps.size() == FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH
+			&& IntStream.range(0, columnGenerationSteps.size())
 			.noneMatch((int intValue) ->
 			{
 				byte value = columnGenerationSteps.getByte(intValue);
 				return value == EDhApiWorldGenerationStep.EMPTY.value
 					|| value == EDhApiWorldGenerationStep.DOWN_SAMPLED.value;
 			});
+	}
+	private boolean hasUsableGeneratedCoverage(long pos)
+	{
+		if (!this.repo.existsWithKey(pos))
+		{
+			return false;
+		}
+
+		try(PhantomArrayListCheckout checkout = ARRAY_LIST_POOL.checkoutByteArrays(1))
+		{
+			ByteArrayList columnGenerationSteps = checkout.getByteArray(
+				0,
+				FullDataSourceV2.WIDTH * FullDataSourceV2.WIDTH);
+			this.repo.getColumnGenerationStepForPos(pos, columnGenerationSteps);
+			return this.generationStepsAreFullyGenerated(columnGenerationSteps);
+		}
 	}
 	
 	
@@ -347,34 +394,10 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 		}
 		
 		
-		// don't check any child positions if this position is already fully generated 
-		if (this.repo.existsWithKey(pos))
+		// don't check any child positions if this position is already fully generated
+		if (this.hasUsableGeneratedCoverage(pos))
 		{
-			try(PhantomArrayListCheckout checkout = ARRAY_LIST_POOL.checkoutByteArrays(1))
-			{
-				ByteArrayList columnGenStepArray = checkout.getByteArray(0, FullDataSourceV2.WIDTH*FullDataSourceV2.WIDTH);
-				this.repo.getColumnGenerationStepForPos(pos, columnGenStepArray);
-				if (columnGenStepArray.size() != 0)
-				{
-					boolean positionFullyGenerated = true;
-					
-					// check if any positions are ungenerated
-					for (int i = 0; i < columnGenStepArray.size(); i++)
-					{
-						if (columnGenStepArray.getByte(i) == EDhApiWorldGenerationStep.EMPTY.value
-							|| columnGenStepArray.getByte(i) == EDhApiWorldGenerationStep.DOWN_SAMPLED.value)
-						{
-							positionFullyGenerated = false;
-							break;
-						}
-					}
-					
-					if (positionFullyGenerated)
-					{
-						return new LongArrayList();
-					}
-				}
-			}
+			return new LongArrayList();
 		}
 		
 		
@@ -388,61 +411,9 @@ public class GeneratedFullDataSourceProvider extends FullDataSourceProviderV2 im
 		
 		DhSectionPos.forEachChildAtDetailLevel(pos, lowestGeneratorDetailLevel, (genPos) ->
 		{
-			if (!this.repo.existsWithKey(genPos))
+			if (!this.hasUsableGeneratedCoverage(genPos))
 			{
-				// nothing exists for this position, it needs generation
-				generationList.add(genPos);
-			}
-			else
-			{
-				
-				EDhApiWorldGenerationStep currentMinWorldGenStep = EDhApiWorldGenerationStep.LIGHT;
-				try(PhantomArrayListCheckout checkout = ARRAY_LIST_POOL.checkoutByteArrays(1))
-				{
-					ByteArrayList columnGenerationSteps = checkout.getByteArray(0, FullDataSourceV2.WIDTH*FullDataSourceV2.WIDTH);
-					this.repo.getColumnGenerationStepForPos(genPos, columnGenerationSteps);
-					if (columnGenerationSteps.isEmpty())
-					{
-						// shouldn't happen, but just in case
-						return;
-					}
-					
-					
-					
-					checkWorldGenLoop:
-					for (int x = 0; x < FullDataSourceV2.WIDTH; x++)
-					{
-						for (int z = 0; z < FullDataSourceV2.WIDTH; z++)
-						{
-							int index = FullDataSourceV2.relativePosToIndex(x, z);
-							byte genStepValue = columnGenerationSteps.getByte(index);
-							
-							if (genStepValue < currentMinWorldGenStep.value)
-							{
-								EDhApiWorldGenerationStep newWorldGenStep = EDhApiWorldGenerationStep.fromValue(genStepValue);
-								if (newWorldGenStep != null && newWorldGenStep.value < currentMinWorldGenStep.value)
-								{
-									currentMinWorldGenStep = newWorldGenStep;
-								}
-							}
-							
-							if (currentMinWorldGenStep == EDhApiWorldGenerationStep.EMPTY 
-								|| currentMinWorldGenStep == EDhApiWorldGenerationStep.DOWN_SAMPLED)
-							{
-								// queue the task
-								break checkWorldGenLoop;
-							}
-						}
-					}
-				}
-				
-				if (currentMinWorldGenStep != EDhApiWorldGenerationStep.EMPTY
-					&& currentMinWorldGenStep != EDhApiWorldGenerationStep.DOWN_SAMPLED)
-				{
-					// no world gen needed for this position
-					return;
-				}
-				
+				// this position is missing one or more generated columns
 				generationList.add(genPos);
 			}
 		});
