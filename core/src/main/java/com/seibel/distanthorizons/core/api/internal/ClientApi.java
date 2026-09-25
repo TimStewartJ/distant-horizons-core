@@ -960,7 +960,7 @@ public class ClientApi
 	 * 
 	 * This is good for logging or alerts.
 	 */
-	public void queueFastChatMessage(String chatMessage) { this.slowChatMessageQueue.add(chatMessage); }
+	public void queueFastChatMessage(String chatMessage) { this.fastChatMessageQueue.add(chatMessage); }
 	
 	/**
 	 * Similar to {@link ClientApi#queueSlowChatMessage(String)} but appears above the toolbar.
