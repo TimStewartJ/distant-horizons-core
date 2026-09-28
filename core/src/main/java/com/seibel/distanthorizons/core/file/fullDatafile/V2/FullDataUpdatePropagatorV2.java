@@ -15,6 +15,7 @@ import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.render.renderer.AbstractDebugWireframeRenderer;
 import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
+import com.seibel.distanthorizons.core.sql.DbConnectionClosedException;
 import com.seibel.distanthorizons.core.util.ExceptionUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
 import com.seibel.distanthorizons.core.util.WorldGenUtil;
@@ -145,7 +146,11 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 			}
 			catch (Exception e)
 			{
-				LOGGER.error("Unexpected error in the parent update queue thread. Error: " + e.getMessage(), e);
+				if (!ExceptionUtil.isInterruptOrReject(e)
+					&& !DbConnectionClosedException.isClosedException(e))
+				{
+					LOGGER.error("Unexpected error in the parent update queue thread. Error: " + e.getMessage(), e);
+				}
 			}
 		}
 	}
@@ -253,7 +258,11 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 								}
 								catch (Exception e)
 								{
-									LOGGER.error("Unexpected in parent update propagation for parent pos: ["+DhSectionPos.toString(parentInputPos)+"], child pos: [" + DhSectionPos.toString(parentInputPos) + "], Error: [" + e.getMessage() + "].", e);
+									if (!ExceptionUtil.isInterruptOrReject(e)
+										&& !DbConnectionClosedException.isClosedException(e))
+									{
+										LOGGER.error("Unexpected in parent update propagation for parent pos: [" + DhSectionPos.toString(parentInputPos) + "], child pos: [" + DhSectionPos.toString(parentInputPos) + "], Error: [" + e.getMessage() + "].", e);
+									}
 								}
 								finally
 								{
@@ -437,7 +446,11 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 									}
 									catch (Exception e)
 									{
-										LOGGER.error("Unexpected in child update propagation for parent pos: ["+DhSectionPos.toString(parentOutputPos)+"], child pos: [" + DhSectionPos.toString(childInputPos) + "], Error: [" + e.getMessage() + "].", e);
+										if (!ExceptionUtil.isInterruptOrReject(e)
+											&& !DbConnectionClosedException.isClosedException(e))
+										{
+											LOGGER.error("Unexpected in child update propagation for parent pos: [" + DhSectionPos.toString(parentOutputPos) + "], child pos: [" + DhSectionPos.toString(childInputPos) + "], Error: [" + e.getMessage() + "].", e);
+										}
 									}
 									finally
 									{
@@ -532,7 +545,8 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 			}
 			catch (Exception e)
 			{
-				if (!ExceptionUtil.isInterruptOrReject(e))
+				if (!ExceptionUtil.isInterruptOrReject(e)
+					&& !DbConnectionClosedException.isClosedException(e))
 				{
 					LOGGER.error("Regen queueing exception: " + e.getMessage(), e);
 				}
@@ -665,7 +679,8 @@ public class FullDataUpdatePropagatorV2 implements IDebugRenderable, AutoCloseab
 				this.generatingPosSet.remove(updatePos);
 				
 				if (throwable != null 
-					&& !ExceptionUtil.isShutdownException(throwable))
+					&& !ExceptionUtil.isShutdownException(throwable)
+					&& !DbConnectionClosedException.isClosedException(throwable))
 				{
 					LOGGER.error("Unexpected error on Update gen future: ["+throwable.getMessage()+"].", throwable);
 				}
