@@ -24,7 +24,7 @@ import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindab
 import com.seibel.distanthorizons.coreapi.util.StringUtil;
 import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class takes care of dependency injection for world generators. <Br>
@@ -37,7 +37,12 @@ public class WorldGeneratorInjector
 {
 	public static final WorldGeneratorInjector INSTANCE = new WorldGeneratorInjector();
 	
-	private final HashMap<IDhApiLevelWrapper, OverrideInjector> worldGeneratorByLevelWrapper = new HashMap<>();
+	/**
+	 * Concurrent since each level's request thread can bind generators at the same time. <br>
+	 * Entries are removed via {@link #unbind(IDhApiLevelWrapper)} when their level closes,
+	 * otherwise the bound generators would keep the closed level in memory.
+	 */
+	private final ConcurrentHashMap<IDhApiLevelWrapper, OverrideInjector> worldGeneratorByLevelWrapper = new ConcurrentHashMap<>();
 	
 	/**
 	 * This is used to determine if an override is part of Distant Horizons'
@@ -86,11 +91,9 @@ public class WorldGeneratorInjector
 		
 		
 		// bind this generator to the given level
-		if (!this.worldGeneratorByLevelWrapper.containsKey(levelForWorldGenerator))
-		{
-			this.worldGeneratorByLevelWrapper.put(levelForWorldGenerator, new OverrideInjector(this.corePackagePath));
-		}
-		this.worldGeneratorByLevelWrapper.get(levelForWorldGenerator).bind(IDhApiWorldGenerator.class, worldGeneratorImplementation);
+		this.worldGeneratorByLevelWrapper
+			.computeIfAbsent(levelForWorldGenerator, level -> new OverrideInjector(this.corePackagePath))
+			.bind(IDhApiWorldGenerator.class, worldGeneratorImplementation);
 	}
 	
 	
@@ -105,15 +108,32 @@ public class WorldGeneratorInjector
 	 */
 	public IDhApiWorldGenerator get(IDhApiLevelWrapper levelForWorldGenerator) throws ClassCastException
 	{
-		if (!this.worldGeneratorByLevelWrapper.containsKey(levelForWorldGenerator))
+		OverrideInjector injector = this.worldGeneratorByLevelWrapper.get(levelForWorldGenerator);
+		if (injector == null)
 		{
 			// no generator exists for this specific level.
 			return null;
 		}
 		
 		// use the existing world generator
-		return this.worldGeneratorByLevelWrapper.get(levelForWorldGenerator).get(IDhApiWorldGenerator.class);
+		return injector.get(IDhApiWorldGenerator.class);
 	}
+	
+	/**
+	 * Removes every world generator bound to the given level. <br>
+	 * Call this when the level closes, so the level (referenced by its generators) can be garbage collected.
+	 * Does nothing if the level is null or has no generators.
+	 */
+	public void unbind(IDhApiLevelWrapper levelForWorldGenerator)
+	{
+		if (levelForWorldGenerator != null)
+		{
+			this.worldGeneratorByLevelWrapper.remove(levelForWorldGenerator);
+		}
+	}
+	
+	/** Used for unit tests */
+	public int boundLevelCount() { return this.worldGeneratorByLevelWrapper.size(); }
 	
 	
 	

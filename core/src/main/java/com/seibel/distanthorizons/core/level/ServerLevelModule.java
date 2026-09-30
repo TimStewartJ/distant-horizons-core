@@ -70,6 +70,8 @@ public class ServerLevelModule implements AutoCloseable
 		// shutdown the world-gen
 		this.lodRequestModule.close();
 		this.fullDataFileHandler.close();
+		// the bound world generators reference this level
+		WorldGeneratorInjector.INSTANCE.unbind(this.parentServerLevel.getLevelWrapper());
 	}
 	
 	

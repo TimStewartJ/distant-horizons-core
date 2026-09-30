@@ -38,6 +38,13 @@ import testItems.singletonInjection.objects.ConcreteSingletonTestBoth;
 import testItems.singletonInjection.objects.ConcreteSingletonTestOne;
 import testItems.singletonInjection.objects.ConcreteSingletonTestTwo;
 import testItems.worldGeneratorInjection.objects.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -262,6 +269,67 @@ public class DependencyInjectorTest
 		Assert.assertNull("Nothing should have been bound to this level.", TEST_INJECTOR.get(unboundLevel));
 		
 		
+	}
+	
+	/** A closed level's generators must be dropped, or the injector keeps the level (and its world) alive. */
+	@Test
+	public void testWorldGeneratorUnbindReleasesTheLevel()
+	{
+		WorldGeneratorInjector TEST_INJECTOR = new WorldGeneratorInjector(WorldGeneratorTestAssembly.getPackagePath(2));
+		IDhApiLevelWrapper closedLevel = new LevelWrapperTest();
+		IDhApiLevelWrapper openLevel = new LevelWrapperTest();
+		TEST_INJECTOR.bind(closedLevel, new WorldGeneratorTestCore());
+		TEST_INJECTOR.bind(openLevel, new WorldGeneratorTestPrimary());
+		Assert.assertEquals(2, TEST_INJECTOR.boundLevelCount());
+		
+		TEST_INJECTOR.unbind(closedLevel);
+		Assert.assertNull("The closed level's generator should be gone.", TEST_INJECTOR.get(closedLevel));
+		Assert.assertNotNull("Other levels keep their generators.", TEST_INJECTOR.get(openLevel));
+		Assert.assertEquals(1, TEST_INJECTOR.boundLevelCount());
+		
+		// unbinding twice or unbinding null is harmless
+		TEST_INJECTOR.unbind(closedLevel);
+		TEST_INJECTOR.unbind(null);
+		Assert.assertEquals(1, TEST_INJECTOR.boundLevelCount());
+	}
+	
+	/** Each dimension's request ticker binds its own level concurrently; no bind may lose its entry. */
+	@Test
+	public void testConcurrentWorldGeneratorBinding() throws Exception
+	{
+		WorldGeneratorInjector TEST_INJECTOR = new WorldGeneratorInjector(WorldGeneratorTestAssembly.getPackagePath(2));
+		int threads = 8;
+		int levelsPerThread = 2_000;
+		ExecutorService pool = Executors.newFixedThreadPool(threads);
+		CountDownLatch start = new CountDownLatch(1);
+		List<Future<Integer>> results = new ArrayList<>();
+		for (int t = 0; t < threads; t++)
+		{
+			results.add(pool.submit(() ->
+			{
+				start.await();
+				int missing = 0;
+				for (int i = 0; i < levelsPerThread; i++)
+				{
+					IDhApiLevelWrapper level = new LevelWrapperTest();
+					TEST_INJECTOR.bind(level, new WorldGeneratorTestCore());
+					if (TEST_INJECTOR.get(level) == null)
+					{
+						missing++;
+					}
+				}
+				return missing;
+			}));
+		}
+		start.countDown();
+		int missing = 0;
+		for (Future<Integer> result : results)
+		{
+			missing += result.get(60, TimeUnit.SECONDS);
+		}
+		pool.shutdown();
+		Assert.assertEquals("Every bound level must be readable right after binding.", 0, missing);
+		Assert.assertEquals(threads * levelsPerThread, TEST_INJECTOR.boundLevelCount());
 	}
 	
 }
