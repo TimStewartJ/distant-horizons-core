@@ -17,6 +17,7 @@ import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /** 
@@ -38,7 +39,9 @@ public abstract class AbstractLodRequestState
 	public final IFullDataSourceRetrievalQueue retrievalQueue;
 	
 	private final ThreadPoolExecutor progressUpdaterThread = ThreadUtil.makeSingleDaemonThreadPool("World Gen Progress Updater");
-	private boolean progressUpdateThreadRunning = false;
+	private volatile boolean progressUpdateThreadRunning = false;
+	/** once closed the progress thread shouldn't be restarted */
+	private volatile boolean closed = false;
 	
 	
 	
@@ -71,28 +74,41 @@ public abstract class AbstractLodRequestState
 	private void startProgressUpdateThread()
 	{
 		// only start the thread once
-		if (!this.progressUpdateThreadRunning)
+		if (!this.progressUpdateThreadRunning && !this.closed)
 		{
 			this.progressUpdateThreadRunning = true;
 			
-			this.progressUpdaterThread.execute(() ->
+			try
 			{
-				while (this.progressUpdateThreadRunning)
+				this.progressUpdaterThread.execute(() ->
 				{
-					try
+					while (this.progressUpdateThreadRunning)
 					{
-						this.sendRetrievalProgress();
-						
-						// sleep so we only see an update once in a while
-						int sleepTimeInSec = Config.Common.WorldGenerator.generationProgressDisplayIntervalInSeconds.get();
-						Thread.sleep(sleepTimeInSec * 1_000L);
+						try
+						{
+							this.sendRetrievalProgress();
+							
+							// sleep so we only see an update once in a while
+							int sleepTimeInSec = Config.Common.WorldGenerator.generationProgressDisplayIntervalInSeconds.get();
+							Thread.sleep(sleepTimeInSec * 1_000L);
+						}
+						catch (InterruptedException e)
+						{
+							// the executor was shut down
+							return;
+						}
+						catch (Exception e)
+						{
+							LOGGER.error("Unexpected issue displaying chunk retrieval progress [" + e.getMessage() + "].", e);
+						}
 					}
-					catch (Exception e)
-					{
-						LOGGER.error("Unexpected issue displaying chunk retrieval progress [" + e.getMessage() + "].", e);
-					}
-				}
-			});
+				});
+			}
+			catch (RejectedExecutionException e)
+			{
+				// the level was closed while starting
+				this.progressUpdateThreadRunning = false;
+			}
 		}
 	}
 	private void sendRetrievalProgress()
@@ -204,8 +220,11 @@ public abstract class AbstractLodRequestState
 	
 	public CompletableFuture<Void> closeAsync(boolean doInterrupt)
 	{
+		this.closed = true;
 		// this should stop the updater thread
 		this.progressUpdateThreadRunning = false;
+		// the executor's thread never times out, so it has to be shut down or one idle thread will leak per level
+		this.progressUpdaterThread.shutdownNow();
 		
 		return this.retrievalQueue.startClosingAsync(true, doInterrupt)
 			.exceptionally(e ->
