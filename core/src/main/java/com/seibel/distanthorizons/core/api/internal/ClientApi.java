@@ -357,6 +357,19 @@ public class ClientApi
 	 */
 	public void renderDeferredLodsForShaders() { this.renderLodLayer(true); }
 	
+	/** The pass for a layer, given whether transparent LODs are currently deferred to a shader pipeline. */
+	private static EDhApiRenderPass getRenderPass(boolean renderingDeferredLayer)
+	{
+		if (DhApiRenderProxy.INSTANCE.getDeferTransparentRendering())
+		{
+			return renderingDeferredLayer ? EDhApiRenderPass.TRANSPARENT : EDhApiRenderPass.OPAQUE;
+		}
+		else
+		{
+			return EDhApiRenderPass.OPAQUE_AND_TRANSPARENT;
+		}
+	}
+	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
 		IProfilerWrapper profiler = MC_CLIENT.getProfiler();
@@ -519,22 +532,7 @@ public class ClientApi
 			//=================//
 			//region
 			
-			EDhApiRenderPass renderPass;
-			if (DhApiRenderProxy.INSTANCE.getDeferTransparentRendering())
-			{
-				if (renderingDeferredLayer)
-				{
-					renderPass = EDhApiRenderPass.TRANSPARENT;
-				}
-				else
-				{
-					renderPass = EDhApiRenderPass.OPAQUE;
-				}
-			}
-			else
-			{
-				renderPass = EDhApiRenderPass.OPAQUE_AND_TRANSPARENT;
-			}
+			EDhApiRenderPass renderPass = getRenderPass(renderingDeferredLayer);
 			
 			// A global render state variable is used since MC has split up their
 			// render prep and actual rendering into different threads/methods
@@ -607,6 +605,17 @@ public class ClientApi
 						// normal/opaque
 						
 						boolean renderingCancelled = ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeRenderEvent.class, RENDER_PARAMS);
+						
+						// Shader mods (Iris) decide in this event whether transparent LODs are deferred to their pipeline,
+						// but the pass above was chosen with the previous frame's answer. In the first frame after a
+						// shader pipeline is created or destroyed the two differ, and the combined pass would draw with
+						// DH's own shader into the shader pack's buffers (Iris only binds its programs for the split passes).
+						EDhApiRenderPass currentRenderPass = getRenderPass(false);
+						if (RENDER_PARAMS.renderPass != currentRenderPass)
+						{
+							RENDER_PARAMS.update(currentRenderPass, RENDER_STATE);
+						}
+						
 						if (!renderingCancelled)
 						{
 							LodRenderer.INSTANCE.render(RENDER_PARAMS, profiler);
