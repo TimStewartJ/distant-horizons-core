@@ -115,6 +115,16 @@ public class ClientApi
 	private static final RenderParams RENDER_PARAMS = new RenderParams();
 	
 	/**
+	 * Removes the level references held by {@link #RENDER_STATE} and {@link #RENDER_PARAMS}. <br>
+	 * Called when the world is closed, otherwise the last rendered level (and in singleplayer the server) can't be garbage collected.
+	 */
+	public static void clearLevelReferences()
+	{
+		RENDER_STATE.clientLevelWrapper = null;
+		RENDER_PARAMS.clearLevelReferences();
+	}
+	
+	/**
 	 * 50ms = 20 FPS
 	 * @link https://fpstoms.com/ 
 	 * @see ClientApi#cameraSpeedRollingAverage

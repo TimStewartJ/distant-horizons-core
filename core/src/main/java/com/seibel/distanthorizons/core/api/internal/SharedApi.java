@@ -132,6 +132,7 @@ public class SharedApi
 				
 				RenderThreadTaskHandler.INSTANCE.clearDebugStats();
 				BlockTextureRegistry.INSTANCE.clear();
+				ClientApi.clearLevelReferences();
 				
 				// recommend that the garbage collector cleans up any objects from the old world and thread pools
 				System.gc();

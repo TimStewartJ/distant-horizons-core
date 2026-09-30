@@ -58,6 +58,20 @@ public class RenderParams extends DhApiRenderParam
 	//=============//
 	//region
 	
+	/** Called when the world is closed so the last rendered level can be garbage collected. */
+	public void clearLevelReferences()
+	{
+		this.dhClientWorld = null;
+		this.dhClientLevel = null;
+		this.clientLevelWrapper = null;
+		this.lightmap = null;
+		this.renderBufferHandler = null;
+		this.genericRenderer = null;
+		// the API parent's fields are hidden by this class's fields
+		((DhApiRenderParam) this).clientLevelWrapper = null;
+		this.apiCopy.clientLevelWrapper = null;
+	}
+	
 	public void update(EDhApiRenderPass renderPass, DhRenderState renderState)
 	{
 		RenderUtil.setDhProjectionMatrix(this.dhProjectionMatrix, renderState.mcProjectionMatrix);
